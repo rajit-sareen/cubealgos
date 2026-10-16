@@ -199,7 +199,7 @@ class Timer {
   async importJson(text: string) {
     const data = JSON.parse(text);
     if (data?.format !== 'cubealgos-timer' || !Array.isArray(data.solves) || !Array.isArray(data.sessions))
-      throw new Error('Not a CubeAlgos timer export');
+      throw new Error('Not a cubealgos timer export');
     const sessions: Session[] = data.sessions.filter((s: Session) => s && s.id && s.name);
     const known = new Set(sessions.map(s => s.id));
     const solves: Solve[] = data.solves.filter((s: Solve) =>

@@ -8,10 +8,10 @@ import { ProfilePage } from './pages/ProfilePage';
 import { SolveDetail } from './components/SolveDetail';
 
 const ROUTES = [
-  { path: '', name: 'Timer', title: 'CubeAlgos — Rubik\'s Cube Timer' },
-  { path: 'stats', name: 'Stats', title: 'Stats & Coaching — CubeAlgos' },
-  { path: 'sim', name: 'Simulator', title: 'Cube Simulator — CubeAlgos' },
-  { path: 'profile', name: 'Profile', title: 'Profile — CubeAlgos', icon: true },
+  { path: '', name: 'Timer', title: 'cubealgos' },
+  { path: 'stats', name: 'Stats', title: 'Stats — cubealgos' },
+  { path: 'sim', name: 'Simulator', title: 'Simulator — cubealgos' },
+  { path: 'profile', name: 'Profile', title: 'Profile — cubealgos', icon: true },
 ];
 
 type Theme = 'light' | 'dark';
@@ -64,7 +64,7 @@ export function App() {
   return (
     <div id="app" className={cls}>
       <header id="top">
-        <a className="brand" href="#/">CUBEALGOS</a>
+        <a className="brand" href="#/">cubealgos</a>
         <nav className="tabs">
           {ROUTES.filter(r => !r.icon).map(r => (
             <a key={r.path} href={'#/' + r.path} className={r === route ? 'on' : ''} aria-current={r === route ? 'page' : undefined}>{r.name}</a>

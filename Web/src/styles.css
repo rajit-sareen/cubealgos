@@ -160,7 +160,7 @@ details summary::before { content: "+ "; } details[open] summary::before { conte
 @media (max-width: 860px) { body { overflow: auto; } #root { height: auto; min-height: 100%; } #app { height: auto; min-height: 100vh; } #main { min-height: auto; } }
 
 /* Header Tabs */
-#top .brand { font-weight: 700; letter-spacing: .12em; color: inherit; text-decoration: none; }
+#top .brand { font-weight: 700; letter-spacing: .06em; text-transform: none; color: inherit; text-decoration: none; }
 #top .tabs { display: flex; height: 100%; }
 #top .tabs a { display: flex; align-items: center; padding: 0 18px; color: var(--grey); text-decoration: none; letter-spacing: .1em; border-left: var(--rule); }
 #top .tabs a:last-child { border-right: var(--rule); }
