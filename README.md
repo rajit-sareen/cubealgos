@@ -2,35 +2,21 @@
 
 # cubealgos
 
-`cubealgos` is a Rubik's Cube engine and solver collection written in C++. It
-generates WCA random-state scrambles and solves them with a choice of methods.
+A Rubik's Cube engine and solver collection in C++. Generates WCA random-state
+scrambles and solves them with a choice of methods.
 
-[![C++](https://img.shields.io/badge/C%2B%2B-17-blue?style=flat)](#build)
-[![license](https://img.shields.io/badge/license-MIT-green?style=flat)](LICENSE)
-[![tests](https://img.shields.io/badge/tests-passing-brightgreen?style=flat)](#build)
+**Try it in the browser:** [rajit-sareen.github.io/cubealgos](https://rajit-sareen.github.io/cubealgos/),
+a timer, stats and 3D simulator running this engine as WebAssembly.
 
-**Just want to time solves?** Use the site at
-**[godking123.github.io/cubealgos](https://godking123.github.io/cubealgos/)**: a cube
-timer, stats and a 3D simulator, running this same engine in your browser. Nothing to
-install.
-
-## Build
+## Build and Run
 
 Needs a C++17 compiler and `make`.
 
 ```sh
 make              # builds ./cubealgo and ./tests
 make test         # runs the test suite
+./cubealgo        # ENTER for a scramble and solution, m changes method, q quits
 ```
-
-## Run
-
-```sh
-./cubealgo
-```
-
-Pick a method, then press ENTER for a WCA random-state scramble and its solution.
-`m` changes method, `q` quits.
 
 ## Methods
 
@@ -45,19 +31,11 @@ Pick a method, then press ENTER for a WCA random-state scramble and its solution
 ```
 CubeState/     Cube representation, move tables, notation, scrambles
 Solvers/       One directory per method, all behind Method.h
-Scramblers/    WCA random-state scrambles (needs a solver, so it sits above both)
+Scramblers/    WCA random-state scrambles
+Web/           The browser site (see Web/README.md)
 Main.cc        The command-line front end
 Tests.cc       The numbered test suite
 ```
-
-Adding a method is a new directory under `Solvers/` and one line in
-`Solvers/Method.cc`.
-
-## The Website
-
-The site's source lives in `Web/` and deploys itself from `main`. You don't need it to
-build or run the engine. If you're working on the site itself, see
-[Web/README.md](Web/README.md).
 
 ## License
 
