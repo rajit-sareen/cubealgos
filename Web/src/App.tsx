@@ -8,10 +8,10 @@ import { ProfilePage } from './pages/ProfilePage';
 import { SolveDetail } from './components/SolveDetail';
 
 const ROUTES = [
-  { path: '', name: 'Timer', title: 'cubealgos' },
-  { path: 'stats', name: 'Stats', title: 'Stats — cubealgos' },
-  { path: 'sim', name: 'Simulator', title: 'Simulator — cubealgos' },
-  { path: 'profile', name: 'Profile', title: 'Profile — cubealgos', icon: true },
+  { path: '', name: 'Timer' },
+  { path: 'stats', name: 'Stats' },
+  { path: 'sim', name: 'Simulator' },
+  { path: 'profile', name: 'Profile', icon: true },
 ];
 
 type Theme = 'light' | 'dark';
@@ -57,7 +57,6 @@ export function App() {
   const t = useTimer();
   const [theme, toggleTheme] = useTheme();
   useEffect(() => { sim.boot(); timer.boot(); }, []);
-  useEffect(() => { document.title = route.title; }, [route]);
   const solving = route.path === '' && t.settings.focus && t.phase !== 'idle';
   const cls = [s.opts.rgb && 'rgb', s.opts.modern && 'modern', s.opts.grey && 'greydim', solving && 'focus']
     .filter(Boolean).join(' ');
