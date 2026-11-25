@@ -83,6 +83,12 @@ select { background: var(--paper); border: var(--rule); padding: 3px 6px; appear
 .keys { display: grid; grid-template-columns: repeat(6, 1fr); gap: 4px; text-transform: none; }
 .keys button { padding: 3px 0; font-weight: 700; }
 .keys.rot { grid-template-columns: repeat(3, 1fr); width: 50%; margin-top: 4px; }
+.crosses { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; margin-top: 6px; }
+.crosses button { display: flex; align-items: center; gap: 6px; padding: 4px 8px; font-size: 12px; }
+.crosses .any { grid-column: 1 / -1; }
+.crosses b { margin-left: auto; min-width: 1ch; font-variant-numeric: tabular-nums; }
+.crosses .sw { flex: none; width: 12px; height: 12px; border: 1.5px solid var(--cube); background-color: #fff; background-image: var(--p); image-rendering: pixelated; }
+#app.rgb .crosses .sw { background-image: none; background-color: var(--c); }
 
 /* Viewport */
 #viewport { position: relative; overflow: hidden; display: grid; place-items: center; cursor: grab; user-select: none; min-width: 0; background-color: var(--paper);

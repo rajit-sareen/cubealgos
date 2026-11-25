@@ -47,6 +47,12 @@ class Sim {
   tempo = 50;
   opts: Opts = { turn: 220, gap: 160, dim: true, grey: false, card: true, cam: true, idle: true, rgb: true, modern: true };
   plan: Plan | null = null;
+  // The cube a plan was made for, kept once the plan has been played through, so another
+  // cross can be tried from the same start. Any move made by hand forgets it
+  private base: Snap | null = null;
+  cross: number | null = null;       // Cross Colour to Plan On, Null for the Shortest
+  crosses: number[] | null = null;   // Cross Length per Colour
+  private crossKey = '';
   playing = false;
   busy = false;
   scrambleMoves: string[] = [];
@@ -341,6 +347,7 @@ class Sim {
       res();
     }
     this.pumping = false;
+    this.refreshCrosses();
   }
 
   // Moves made by hand invalidate a plan, since it was computed for the state before them
@@ -350,7 +357,7 @@ class Sim {
     if (bad) { this.status('Unknown move ' + bad); return false; }
     this.busy = true;
     try {
-      if (!keepPlan && this.plan) this.plan = null;
+      if (!keepPlan) this.plan = this.base = null;
       if (this.opts.turn > 0) {
         for (const t of tokens) {
           const [res] = await Promise.all([api<Snap & Err>('apply', { seq: t }), this.animateTurn(t)]);
@@ -370,6 +377,7 @@ class Sim {
   private setPlan(groups: Group[]) {
     const gs = groups.filter(g => g.tokens.length);
     this.plan = gs.length ? { groups: gs, pos: 0, total: gs.reduce((n, g) => n + g.tokens.length, 0) } : null;
+    this.base = this.plan ? this.snap : null;
     this.render();
   }
   step = async () => {
@@ -435,7 +443,7 @@ class Sim {
     if (this.opts.cam && !this.visible('F')) this.cam.target = { ...HOME_ORBIT };
     if (this.method === 'kociemba') return (await this.kociemba()) != null;
     this.status('Searching');
-    const r = await api<Err & { rotation: string; steps: { label: string; case: string; moves: string[] }[] }>('cfop');
+    const r = await api<Err & { rotation: string; steps: { label: string; case: string; moves: string[] }[] }>('cfop', { color: this.cross ?? -1 });
     if (this.fail(r)) return false;
     const rot = r.rotation ? r.rotation.split(' ') : [];
     this.setPlan(r.steps.map((s, i) => ({ label: s.label, tokens: i === 0 ? [...rot, ...s.moves] : s.moves, caseName: s.case })));
@@ -447,12 +455,60 @@ class Sim {
     await this.play();
   };
 
+  // Cross lengths for the cube a pick would plan from, which stays put while a plan plays
+  private async refreshCrosses() {
+    const s = this.snap;
+    if (!s || this.base || this.method !== 'cfop') return;
+    const key = s.solved ? '' : JSON.stringify([s.cp, s.co, s.ep, s.eo, s.hold]);
+    if (key === this.crossKey) return;
+    this.crossKey = key;
+    this.crosses = null;
+    this.notify();
+    if (!key) return;
+    const r = await api<Err & { lengths: number[] }>('crosses');
+    if (key !== this.crossKey || r.error) return;
+    this.crosses = r.lengths;
+    this.notify();
+  }
+
+  // Goes back to the cube the current plan started from and plans it again
+  pickCross(color: number | null) {
+    this.cross = color; this.playing = false; this.notify();
+    if (!this.snap) return;
+    this.run(async () => {
+      const start = this.base;
+      this.plan = this.base = null;
+      while (start && this.snap!.history > start.history) this.snap = await api<Snap>('undo');
+      this.render();
+      await this.planSolution();
+    });
+  }
+
+  // A timer solve's scramble, put on the cube at once and planned, ready to play
+  loadScramble(moves: string[]) {
+    this.escape();
+    this.method = 'cfop';
+    this.run(async () => {
+      const r = await api<Snap & Err>('reset'); if (this.fail(r)) return;
+      this.snap = r;
+      this.scrambleMoves = []; this.scramblePos = 0;
+      const turn = this.opts.turn;
+      this.opts.turn = 0;
+      const ok = await this.applyTokens(moves);
+      this.opts.turn = turn;
+      if (!ok) return;
+      this.scrambleMoves = moves; this.scramblePos = moves.length;
+      this.refreshCrosses();
+      await this.planSolution();
+    });
+  }
+
   // A scramble is fetched and then played out as real moves on a reset cube
   scramble = async () => {
     if (this.busy || this.playing) return;
     this.status('Scrambling');
     const r = await api<Err & { moves: string[] }>('wca'); if (this.fail(r)) return;
-    this.snap = await api<Snap>('reset'); this.plan = null;
+    this.snap = await api<Snap>('reset'); this.plan = this.base = null;
     this.scrambleMoves = r.moves; this.scramblePos = 0; this.render();
     const save = { turn: this.opts.turn, gap: this.opts.gap };
     Object.assign(this.opts, this.opts.turn ? SCRAMBLE_TEMPO : { turn: 0, gap: 0 });
@@ -462,12 +518,12 @@ class Sim {
   };
   reset = async () => {
     if (this.busy || this.playing) return;
-    this.snap = await api<Snap>('reset'); this.plan = null; this.scrambleMoves = [];
+    this.snap = await api<Snap>('reset'); this.plan = this.base = null; this.scrambleMoves = [];
     this.render();
   };
   undo = async () => {
     if (this.busy || this.playing) return;
-    this.plan = null; this.snap = await api<Snap>('undo'); this.render();
+    this.plan = this.base = null; this.snap = await api<Snap>('undo'); this.render();
   };
 
   // Space: scramble a solved cube, load the sequence for a scrambled one, then play
@@ -480,12 +536,13 @@ class Sim {
   };
   manual = (tokens: string[]) => { if (!this.playing && this.snap) this.run(() => this.applyTokens(tokens)); };
   escape() {
-    this.plan = null; this.playing = false;
+    this.plan = this.base = null; this.playing = false;
     this.queue.splice(0).forEach(q => q.res());
     this.render();
+    this.refreshCrosses();
   }
 
-  setMethod(m: Method) { this.method = m; this.plan = null; this.render(); }
+  setMethod(m: Method) { this.method = m; this.plan = this.base = null; this.render(); this.refreshCrosses(); }
   setOpt(key: OptKey, on: boolean) { this.opts[key] = on; store.set(key, on ? '1' : '0'); this.notify(); }
   setTempo(v: number) {
     v = Math.max(0, Math.min(100, Math.round(v)));

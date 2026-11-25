@@ -142,15 +142,26 @@ std::string step(const std::string& label, const std::vector<Move>& m,
     return "{\"label\":" + quoted(label) + ",\"case\":" + quoted(name) + ",\"moves\":" + moves(m) + "}";
 }
 
+// The cross on one sticker colour, whichever way the session holds the cube
+//
+// orientationWithBottom counts faces from the frame the state is in, which stops
+// matching the stickers once the cube has been rotated, so find the colour's face first
+CrossResult crossOn(const CubeState& s, const Orientation& hold, int color) {
+    int face = 0;
+    while (hold.faceAt(face) != color) face++;
+    Orientation o = orientationWithBottom(face);
+    return {face, o, Cross::solveCross(s.rotate(o))};
+}
+
 // Every stage in the cross frame, so the page shows the rotation once and the moves
-// as a solver holding the cube would make them
-std::string cfop(const CubeState& start) {
-    CrossResult cross = Cross::bestCross(start);
+// as a solver holding the cube would make them. A color of -1 takes the shortest cross
+std::string cfop(const CubeState& start, const Orientation& hold, int color = -1) {
+    CrossResult cross = color < 0 ? Cross::bestCross(start) : crossOn(start, hold, color);
     CubeState s = start.rotate(cross.hold);
     auto run = [&](const std::vector<Move>& m) { for (Move x : m) s = s.apply(x); return m; };
 
     std::string out = "{\"rotation\":" + quoted(rotationsTo(cross.hold)) + ",\"steps\":[";
-    out += step(std::string(colorName(cross.color)) + " cross", run(cross.moves));
+    out += step(std::string(colorName(hold.faceAt(cross.color))) + " cross", run(cross.moves));
     static const char* slotName[] = {"DFR", "DLF", "DBL", "DRB"};
     for (const F2LPair& p : F2L::solve(s))
         out += "," + step(std::string(slotName[p.slot]) + " pair", run(p.moves));
@@ -185,7 +196,7 @@ std::string analyze(const std::string& scramble) {
     }
     Session view;
     view.state = s;
-    return out + "],\"cfop\":" + cfop(s) + ",\"state\":" + snapshot(view) + "}";
+    return out + "],\"cfop\":" + cfop(s, Orientation{}) + ",\"state\":" + snapshot(view) + "}";
 }
 
 std::string handle(Session& ss, const std::string& cmd, std::map<std::string, std::string>& q) {
@@ -271,7 +282,18 @@ std::string handle(Session& ss, const std::string& cmd, std::map<std::string, st
         if (!OLL::isSolved(ss.state)) return err("Orient the last layer first");
         return "{\"case\":" + quoted(PLL::caseName(ss.state)) + ",\"moves\":" + moves(PLL::solve(ss.state)) + "}";
     }
-    if (cmd == "cfop") return cfop(ss.state);
+    // Cross Length per Sticker Colour
+    if (cmd == "crosses") {
+        std::string out = "{\"lengths\":[";
+        for (int c = 0; c < 6; c++)
+            out += (c ? "," : "") + std::to_string(crossOn(ss.state, ss.hold, c).moves.size());
+        return out + "]}";
+    }
+    if (cmd == "cfop") {
+        int color = q.count("color") ? std::stoi(q["color"]) : -1;
+        if (color < -1 || color > 5) return err("color is 0 to 5, or -1 for the shortest");
+        return cfop(ss.state, ss.hold, color);
+    }
     if (cmd == "kociemba") return "{\"moves\":" + moves(Kociemba::solve(ss.state)) + "}";
     // Timer commands, stateless: the cube a scramble reaches, and its analysis
     if (cmd == "preview") { Session view; view.state = scrambled(q["scramble"]); return snapshot(view); }

@@ -4,11 +4,13 @@ import type { Analysis, Penalty } from '../timer/db';
 import { fmt, fmtSolve, methodOf, stageTimes } from '../timer/stats';
 import { HAS_CROSS, METHOD_STAGES } from '../timer/profile';
 import { crossLook, stageSummary } from '../timer/insights';
+import { sim } from '../sim';
 import { CrossBars, SplitBars } from './Charts';
 import { Net } from './Net';
 
 // One solve in full: result and penalty, the scramble, the optimal cross the engine
-// finds for it, and the solve's own stage splits against the session
+// finds for it, the solve's own stage splits against the session, and a way into the
+// simulator with its scramble
 export function SolveDetail() {
   const t = useTimer();
   const idx = t.solves.findIndex(s => s.id === t.openSolve);
@@ -41,6 +43,11 @@ export function SolveDetail() {
   const look = a ? crossLook(a, color) : null;
   const lengths = a ? Object.fromEntries(a.crosses.map(c => [c.color, c.moves.length])) : null;
   const pen = (p: Penalty) => timer.setPenalty(s.id, p);
+  const analyze = () => {
+    timer.open(null);
+    location.hash = '#/sim';
+    sim.loadScramble(s.scramble.split(/\s+/).filter(Boolean));
+  };
   return (
     <div className="modal" onMouseDown={e => { if (e.target === e.currentTarget) timer.open(null); }}>
       <div className="sheet" role="dialog" aria-modal="true" aria-label={`Solve ${idx + 1}`}>
@@ -86,6 +93,10 @@ export function SolveDetail() {
               })}</tbody>
             </table>
           </section>}
+
+          <section className="pane wide">
+            <button className="wide-btn" style={{ marginTop: 0 }} onClick={analyze}>Analyze solve</button>
+          </section>
         </div>
         {s.penalty !== 'ok' && <div className="sheet-foot">Raw {fmt(s.time)}</div>}
       </div>

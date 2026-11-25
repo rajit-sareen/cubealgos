@@ -1,5 +1,5 @@
-import { useEffect, useLayoutEffect, useRef } from 'react';
-import { pad3, tempoOf } from '../cube';
+import { useEffect, useLayoutEffect, useRef, type CSSProperties } from 'react';
+import { COLOR_NAMES, COLOR_VARS, PATTERN_VARS, pad3, tempoOf } from '../cube';
 import { STAGE_NAMES, sim, useSim, type Method, type OptKey } from '../sim';
 import { Viewport } from '../components/Viewport';
 
@@ -48,6 +48,7 @@ function LeftPanel() {
           <option value="kociemba">Kociemba</option>
         </select>
       </div>
+      {s.method === 'cfop' && <CrossPicker />}
       <div className="blk">
         <div className="lbl">Tempo</div>
         <div className="tempo-read"><b>{t.name}</b><span>{t.turn ? `${t.turn} ms / move` : 'no animation'}</span></div>
@@ -71,6 +72,31 @@ function LeftPanel() {
         </div>
       </div>
     </aside>
+  );
+}
+
+// Opposite Colours Side by Side
+const CROSS_ORDER = ['white', 'yellow', 'green', 'blue', 'red', 'orange'].map(c => COLOR_NAMES.indexOf(c));
+
+// Cross colour to solve on, with the moves its optimal cross takes from here
+function CrossPicker() {
+  const s = useSim();
+  const best = s.crosses ? Math.min(...s.crosses) : null;
+  return (
+    <div className="blk">
+      <div className="lbl">Cross</div>
+      <div className="crosses">
+        <button className={'any' + (s.cross == null ? ' on' : '')} aria-pressed={s.cross == null} disabled={!s.snap}
+                onClick={() => sim.pickCross(null)}>Shortest<b>{best ?? ''}</b></button>
+        {CROSS_ORDER.map(c => (
+          <button key={c} className={s.cross === c ? 'on' : ''} aria-pressed={s.cross === c} disabled={!s.snap}
+                  onClick={() => sim.pickCross(c)}>
+            <i className="sw" style={{ '--c': COLOR_VARS[c], '--p': PATTERN_VARS[c] } as CSSProperties} />
+            {COLOR_NAMES[c]}<b>{s.crosses?.[c] ?? ''}</b>
+          </button>
+        ))}
+      </div>
+    </div>
   );
 }
 
