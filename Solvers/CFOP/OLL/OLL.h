@@ -4,6 +4,7 @@
 #include <cstdint>
 #include <string>
 #include <vector>
+#include "../CaseTable.h"
 #include "../../../CubeState/CubeState.h"
 
 // Orient the last layer, F2L already solved
@@ -14,6 +15,9 @@ namespace OLL {
     // Case Table, Every U Layer Orientation to the Moves That Orient It
     void buildTables();
     int tableSize();
+
+    // The case, its alg as written and as face turns
+    Case find(const CubeState& s);
 
     // Moves that orient the U layer
     std::vector<Move> solve(const CubeState& s);

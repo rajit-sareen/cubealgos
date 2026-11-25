@@ -13,7 +13,11 @@
 #include "Solvers/CFOP/OLL/OLLAlgos.h"
 #include "Solvers/CFOP/PLL/PLL.h"
 #include "Solvers/CFOP/PLL/PLLAlgos.h"
+#include "Solvers/CFOP/TwoLook/TwoLook.h"
+#include "Solvers/CFOP/TwoLook/TwoLookAlgos.h"
+#include "Solvers/CFOP/CFOP.h"
 #include "Scramblers/WCA.h"
+#include <sstream>
 
 // ─── ANSI Color Codes ──────────────────────────────────────────────────────────
 #define RESET   "\033[0m"
@@ -1067,7 +1071,7 @@ static bool runAllTests() {
     // Test 76: every method in the table is wired up — a null pointer here crashes Main
     // the moment the method is picked
     {
-        bool ok = (METHOD_COUNT == 3);
+        bool ok = (METHOD_COUNT == 4);
         for (int i = 0; i < METHOD_COUNT; i++) {
             if (METHODS[i].name == nullptr || METHODS[i].description == nullptr) ok = false;
             if (METHODS[i].buildTables == nullptr || METHODS[i].solve == nullptr) ok = false;
@@ -1546,8 +1550,8 @@ static bool runAllTests() {
     {
         bool ok = OLL::tableSize() == 216 && OLL::caseName(CubeState::solved()).empty();
         static const Move AUF[] = {Move::U, Move::U2, Move::Up};
-        for (const OLLAlgo& a : OLL_ALGS) {
-            std::vector<Move> alg = parseSequence(a.moves);
+        for (const CaseAlgo& a : OLL_ALGS) {
+            std::vector<Move> alg = parseWritten(a.moves);
             CubeState base = CubeState::solved();
             for (int i = alg.size() - 1; i >= 0; i--) base = base.apply(inverseMove(alg[i]));
             if (OLL::caseName(base) != a.name) ok = false;
@@ -1570,8 +1574,8 @@ static bool runAllTests() {
                && PLL::caseName(CubeState::solved().apply(Move::U)).empty()
                && PLL::solve(CubeState::solved()).empty();
         static const Move AUF[] = {Move::U, Move::U2, Move::Up};
-        for (const PLLAlgo& a : PLL_ALGS) {
-            std::vector<Move> alg = parseSequence(a.moves);
+        for (const CaseAlgo& a : PLL_ALGS) {
+            std::vector<Move> alg = parseWritten(a.moves);
             CubeState base = CubeState::solved();
             for (int i = alg.size() - 1; i >= 0; i--) base = base.apply(inverseMove(alg[i]));
             if (PLL::caseName(base) != a.name) ok = false;
@@ -1584,6 +1588,148 @@ static bool runAllTests() {
             }
         }
         total++; if (runTest("PLL table has every case, names match algs, all solve", ok)) passed++;
+    }
+
+    // Test 103: the 2-look tables hold every case and each alg's own case is named after
+    // it, and every last layer alg, full or 2-look, keeps F2L and ends in the hold it
+    // started in, so the stages after it are still written for the right frame
+    {
+        bool ok = TwoLook::edgeTableSize() == 8 && TwoLook::cornerTableSize() == 6
+               && TwoLook::orientEdges(CubeState::solved()).notation.empty()
+               && TwoLook::permuteCorners(CubeState::solved().apply(Move::U)).notation.empty();
+        auto undone = [&](const CaseAlgo& a) {
+            Orientation after;
+            std::vector<Move> alg = parseWritten(a.moves, &after);
+            if (after != Orientation{}) ok = false;
+            CubeState s = CubeState::solved();
+            for (int i = alg.size() - 1; i >= 0; i--) s = s.apply(inverseMove(alg[i]));
+            if (!F2L::isSolved(s)) ok = false;
+            return s;
+        };
+        for (const CaseAlgo& a : EO_ALGS) if (TwoLook::orientEdges(undone(a)).name != a.name) ok = false;
+        for (const CaseAlgo& a : CP_ALGS) if (TwoLook::permuteCorners(undone(a)).name != a.name) ok = false;
+        for (const CaseAlgo& a : OLL_ALGS) undone(a);
+        for (const CaseAlgo& a : PLL_ALGS) undone(a);
+        total++; if (runTest("2-look tables have every case, all algs keep hold and F2L", ok)) passed++;
+    }
+
+    // Test 104: every OLL case is oriented in two looks that keep F2L, the edges first,
+    // and the corner look is always OLL 21 to 27
+    {
+        bool ok = true;
+        static const Move AUF[] = {Move::U, Move::U2, Move::Up};
+        for (const CaseAlgo& a : OLL_ALGS) {
+            std::vector<Move> alg = parseWritten(a.moves);
+            CubeState base = CubeState::solved();
+            for (int i = alg.size() - 1; i >= 0; i--) base = base.apply(inverseMove(alg[i]));
+            for (int turn = 0; turn < 4; turn++) {
+                CubeState s = turn ? base.apply(AUF[turn - 1]) : base;
+                for (Move m : TwoLook::orientEdges(s).moves) s = s.apply(m);
+                if (!TwoLook::edgesOriented(s) || !F2L::isSolved(s)) ok = false;
+                std::string name = OLL::caseName(s);
+                if (!name.empty() && (name < "OLL 21" || name > "OLL 27")) ok = false;
+                for (Move m : OLL::find(s).moves) s = s.apply(m);
+                if (!OLL::isSolved(s) || !F2L::isSolved(s)) ok = false;
+            }
+        }
+        total++; if (runTest("2-look OLL orients every case, edges then corners", ok)) passed++;
+    }
+
+    // Test 105: every PLL case is solved in two looks, the corners first, with the layer
+    // staying oriented in between, and the edge look is a U, an H, a Z or a U turn alone
+    {
+        bool ok = true;
+        static const Move AUF[] = {Move::U, Move::U2, Move::Up};
+        for (const CaseAlgo& a : PLL_ALGS) {
+            std::vector<Move> alg = parseWritten(a.moves);
+            CubeState base = CubeState::solved();
+            for (int i = alg.size() - 1; i >= 0; i--) base = base.apply(inverseMove(alg[i]));
+            for (int turn = 0; turn < 4; turn++) {
+                CubeState s = turn ? base.apply(AUF[turn - 1]) : base;
+                for (Move m : TwoLook::permuteCorners(s).moves) s = s.apply(m);
+                if (!TwoLook::cornersPermuted(s) || !OLL::isSolved(s) || !F2L::isSolved(s)) ok = false;
+                std::string name = PLL::caseName(s);
+                if (!name.empty() && name != "Ua" && name != "Ub" && name != "H" && name != "Z") ok = false;
+                for (Move m : PLL::find(s).moves) s = s.apply(m);
+                if (!s.isSolved()) ok = false;
+            }
+        }
+        total++; if (runTest("2-look PLL solves every case, corners then edges", ok)) passed++;
+    }
+
+    // Test 106: both CFOP methods solve real scrambles in their named stages, by moves and
+    // by notation read straight through, and share a cross and F2L
+    {
+        bool ok = true;
+        static const std::vector<std::string> FULL = {"Cross", "F2L", "OLL", "PLL"};
+        static const std::vector<std::string> TWO = {"Cross", "F2L", "EOLL", "OCLL", "CPLL", "EPLL"};
+        for (uint64_t seed = 200; seed < 260; seed++) {
+            CubeState s = CubeState::solved();
+            for (Move m : WCA::scramble(seed)) s = s.apply(m);
+            std::vector<Stage> two = CFOP::stagesTwoLook(s), full = CFOP::stages(s);
+            for (const auto& stages : {two, full}) {
+                CubeState byMoves = s, byNotation = s;
+                std::vector<std::string> names;
+                std::string written;
+                for (const Stage& st : stages) {
+                    names.push_back(st.name);
+                    written += st.notation + " ";
+                    for (Move m : st.moves) byMoves = byMoves.apply(m);
+                }
+                for (Move m : parseWritten(written)) byNotation = byNotation.apply(m);
+                if (names != FULL && names != TWO) ok = false;
+                if (!byMoves.isSolved() || !byNotation.isSolved()) ok = false;
+            }
+            for (int i = 0; i < 2; i++) if (two[i].notation != full[i].notation) ok = false;
+        }
+        total++; if (runTest("CFOP and 2-look solve 60 scrambles, moves and notation", ok)) passed++;
+    }
+
+    // ─── Written Turns ────────────────────────────────────────────────────────────
+
+    // Test 107: wide and slice turns by their definitions — a rotation is its three layers
+    // turned together and a wide turn its two — for every suffix, done on a scramble one
+    // token at a time. A slice following the wrong face breaks the first three
+    {
+        bool ok = true;
+        auto play = [](const std::string& seq) {
+            CubeState s = CubeState::solved();
+            for (Move m : randomScramble(20, 11)) s = s.apply(m);
+            Orientation hold;
+            std::istringstream in(seq);
+            std::string tok;
+            while (in >> tok) {
+                Turn t = parseTurn(tok);
+                for (Move m : t.moves) s = s.apply(m);
+                s = s.rotate(t.after);
+                hold = hold.then(t.after);
+            }
+            return std::make_pair(s, hold);
+        };
+        auto same = [&](const std::string& a, const std::string& b) {
+            auto x = play(a), y = play(b);
+            return x.first == y.first && x.second == y.second;
+        };
+        static const char* PAIRS[][2] = {
+            {"x", "R M' L'"}, {"y", "U E' D'"}, {"z", "F S B'"},
+            {"r", "R M'"}, {"l", "L M"}, {"u", "U E'"}, {"d", "D E"}, {"f", "F S"}, {"b", "B S'"},
+        };
+        for (auto& p : PAIRS) {
+            std::string a = p[0], b = p[1];
+            if (!same(a, b) || !same(a + "2", b + " " + b)) ok = false;
+            if (!same(a + "'", b + " " + b + " " + b)) ok = false;
+        }
+        // Whole Sequence Against Token by Token
+        Orientation after;
+        std::vector<Move> flat = parseWritten("r U R' U' M2 f E' y x' d", &after);
+        auto walked = play("r U R' U' M2 f E' y x' d");
+        CubeState s = play("").first;
+        for (Move m : flat) s = s.apply(m);
+        if (!(s.rotate(after) == walked.first) || after != walked.second) ok = false;
+        for (const char* bad : {"", "m", "M3", "r''", "Rw", "x2'"}) {
+            try { parseTurn(bad); ok = false; } catch (const std::exception&) {}
+        }
+        total++; if (runTest("Wide and slice turns match their layers", ok)) passed++;
     }
 
     std::cout << "\n" << BOLD;
@@ -1601,5 +1747,6 @@ int main() {
     F2L::buildTables();
     OLL::buildTables();
     PLL::buildTables();
+    TwoLook::buildTables();
     return runAllTests() ? 0 : 1;
 }

@@ -20,11 +20,12 @@ make test         # runs the test suite
 
 ## Methods
 
-| Method   | Approach                           | Status          |
-|----------|------------------------------------|-----------------|
-| Kociemba | Two-phase IDA* search, 18–22 moves | Done            |
-| CFOP     | Cross, F2L, OLL, PLL               | Done            |
-| Roux     | Blocks, CMLL, LSE                  | Not written yet |
+| Method      | Approach                              | Status          |
+|-------------|---------------------------------------|-----------------|
+| Kociemba    | Two-phase IDA* search, 18–22 moves    | Done            |
+| CFOP        | Cross, F2L, OLL, PLL                  | Done            |
+| CFOP 2-look | CFOP with 2-look OLL and PLL, 16 algs | Done            |
+| Roux        | Blocks, CMLL, LSE                     | Not written yet |
 
 ## Layout
 

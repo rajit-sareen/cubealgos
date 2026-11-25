@@ -15,7 +15,7 @@ KOCIEMBA = $(ROOT)/Solvers/KociembaNaive/Coords.cc \
            $(ROOT)/Solvers/KociembaNaive/Kociemba.cc
 SCRAMBLERS = $(ROOT)/Scramblers/WCA.cc
 
-SRCS = cfop-test.cc PieceSearch.cc Cross/Cross.cc F2L/F2L.cc OLL/OLL.cc PLL/PLL.cc \
+SRCS = cfop-test.cc PieceSearch.cc CaseTable.cc Cross/Cross.cc F2L/F2L.cc OLL/OLL.cc PLL/PLL.cc \
        $(CORE) $(KOCIEMBA) $(SCRAMBLERS)
 OBJS = $(addprefix $(BUILD)/,$(notdir $(SRCS:.cc=.o)))
 

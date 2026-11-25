@@ -82,6 +82,7 @@ select { background: var(--paper); border: var(--rule); padding: 3px 6px; appear
 /* Keypad */
 .keys { display: grid; grid-template-columns: repeat(6, 1fr); gap: 4px; text-transform: none; }
 .keys button { padding: 3px 0; font-weight: 700; }
+details .keys:not(.rot) { margin-top: 8px; }
 .keys.rot { grid-template-columns: repeat(3, 1fr); width: 50%; margin-top: 4px; }
 .crosses { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; margin-top: 6px; }
 .crosses button { display: flex; align-items: center; gap: 6px; padding: 4px 8px; font-size: 12px; }
@@ -166,13 +167,12 @@ details summary::before { content: "+ "; } details[open] summary::before { conte
 @media (max-width: 860px) { body { overflow: auto; } #root { height: auto; min-height: 100%; } #app { height: auto; min-height: 100vh; } #main { min-height: auto; } }
 
 /* Header Tabs */
-#top .brand { font-weight: 700; letter-spacing: .06em; text-transform: none; color: inherit; text-decoration: none; }
-#top .tabs { display: flex; height: 100%; }
+#top .tabs { grid-column: 2; display: flex; height: 100%; }
 #top .tabs a { display: flex; align-items: center; padding: 0 18px; color: var(--grey); text-decoration: none; letter-spacing: .1em; border-left: var(--rule); }
 #top .tabs a:last-child { border-right: var(--rule); }
 #top .tabs a:hover { color: var(--ink); background: var(--hover); }
 #top .tabs a.on { color: var(--paper); background: var(--ink); font-weight: 700; }
-@media (max-width: 860px) { #top { grid-template-columns: auto 1fr auto; gap: 8px; padding: 0 8px; } #top .brand { font-size: 11px; letter-spacing: .04em; } #top .theme { padding: 2px 6px; font-size: 10px; } #top .r .status { display: none; } #top .tabs { justify-content: flex-end; } #top .tabs a { padding: 0 8px; font-size: 10px; } }
+@media (max-width: 860px) { #top { grid-template-columns: 1fr auto; gap: 8px; padding: 0 8px; } #top .theme { padding: 2px 6px; font-size: 10px; } #top .r .status { display: none; } #top .tabs { grid-column: 1; } #top .tabs a { padding: 0 8px; font-size: 10px; } }
 
 /* Shared Bits */
 .empty { color: var(--grey); text-transform: none; font-size: 12px; padding: 12px 0; }

@@ -12,6 +12,7 @@
 #include "../../Solvers/CFOP/F2L/F2L.h"
 #include "../../Solvers/CFOP/OLL/OLL.h"
 #include "../../Solvers/CFOP/PLL/PLL.h"
+#include "../../Solvers/CFOP/TwoLook/TwoLook.h"
 #include <emscripten/emscripten.h>
 #include <cstring>
 #include <map>
@@ -39,13 +40,19 @@ std::string arr(const uint8_t* a, int n) {
     return s + "]";
 }
 
-std::string moves(const std::vector<Move>& m) {
+std::string quoted(const std::string& s) { return "\"" + s + "\""; }
+
+std::string moves(const std::vector<std::string>& m) {
     std::string s = "[";
-    for (size_t i = 0; i < m.size(); i++) s += (i ? ",\"" : "\"") + std::string(moveName(m[i])) + "\"";
+    for (size_t i = 0; i < m.size(); i++) s += (i ? "," : "") + quoted(m[i]);
     return s + "]";
 }
 
-std::string quoted(const std::string& s) { return "\"" + s + "\""; }
+std::string moves(const std::vector<Move>& m) {
+    std::vector<std::string> names;
+    for (Move x : m) names.push_back(moveName(x));
+    return moves(names);
+}
 
 // Piece sticker n sits on slot facelet (n + orientation) % k, colours from the hold
 std::string snapshot(const Session& ss) {
@@ -102,12 +109,6 @@ std::map<std::string, std::string> query(const std::string& q) {
     return m;
 }
 
-bool parseRotation(const std::string& t, CubeRot& r) {
-    for (int i = 0; i < 9; i++)
-        if (t == rotationName(static_cast<CubeRot>(i))) { r = static_cast<CubeRot>(i); return true; }
-    return false;
-}
-
 std::vector<uint8_t> ints(const std::string& s) {
     std::vector<uint8_t> v;
     std::istringstream ss(s);
@@ -137,7 +138,8 @@ int placedMask(const CubeState& s) {
 }
 
 // name is the case the step's alg solves, empty for a stage with no case table
-std::string step(const std::string& label, const std::vector<Move>& m,
+template <typename M>
+std::string step(const std::string& label, const std::vector<M>& m,
                  const std::string& name = "") {
     return "{\"label\":" + quoted(label) + ",\"case\":" + quoted(name) + ",\"moves\":" + moves(m) + "}";
 }
@@ -155,7 +157,8 @@ CrossResult crossOn(const CubeState& s, const Orientation& hold, int color) {
 
 // Every stage in the cross frame, so the page shows the rotation once and the moves
 // as a solver holding the cube would make them. A color of -1 takes the shortest cross
-std::string cfop(const CubeState& start, const Orientation& hold, int color = -1) {
+std::string cfop(const CubeState& start, const Orientation& hold, int color = -1,
+                 bool twoLook = false) {
     CrossResult cross = color < 0 ? Cross::bestCross(start) : crossOn(start, hold, color);
     CubeState s = start.rotate(cross.hold);
     auto run = [&](const std::vector<Move>& m) { for (Move x : m) s = s.apply(x); return m; };
@@ -165,10 +168,14 @@ std::string cfop(const CubeState& start, const Orientation& hold, int color = -1
     static const char* slotName[] = {"DFR", "DLF", "DBL", "DRB"};
     for (const F2LPair& p : F2L::solve(s))
         out += "," + step(std::string(slotName[p.slot]) + " pair", run(p.moves));
-    std::string oll = OLL::caseName(s);
-    out += "," + step("OLL", run(OLL::solve(s)), oll);
-    std::string pll = PLL::caseName(s);
-    out += "," + step("PLL", run(PLL::solve(s)), pll);
+    auto look = [&](const char* label, const Case& c) {
+        run(c.moves);
+        out += "," + step(label, c.notation, c.name);
+    };
+    if (twoLook) look("OLL edges", TwoLook::orientEdges(s));
+    look(twoLook ? "OLL corners" : "OLL", OLL::find(s));
+    if (twoLook) look("PLL corners", TwoLook::permuteCorners(s));
+    look(twoLook ? "PLL edges" : "PLL", PLL::find(s));
     return out + "]}";
 }
 
@@ -228,9 +235,10 @@ std::string handle(Session& ss, const std::string& cmd, std::map<std::string, st
         std::vector<std::string> steps;
         CubeState state = ss.state; Orientation hold = ss.hold;
         while (in >> tok) {
-            CubeRot r;
-            if (parseRotation(tok, r)) { state = state.rotate(r); hold = hold.then(r); }
-            else { try { state = state.apply(parseMove(tok)); } catch (const std::exception&) { return err("Unknown token: " + tok); } }
+            Turn turn;
+            try { turn = parseTurn(tok); } catch (const std::exception&) { return err("Unknown token: " + tok); }
+            for (Move m : turn.moves) state = state.apply(m);
+            state = state.rotate(turn.after); hold = hold.then(turn.after);
             steps.push_back(tok);
         }
         push(); ss.state = state; ss.hold = hold;
@@ -275,12 +283,12 @@ std::string handle(Session& ss, const std::string& cmd, std::map<std::string, st
     }
     if (cmd == "oll") {
         if (!F2L::isSolved(ss.state)) return err("Solve F2L first");
-        return "{\"case\":" + quoted(OLL::caseName(ss.state)) + ",\"moves\":" + moves(OLL::solve(ss.state)) + "}";
+        return "{\"case\":" + quoted(OLL::caseName(ss.state)) + ",\"moves\":" + moves(OLL::find(ss.state).notation) + "}";
     }
     if (cmd == "pll") {
         if (!F2L::isSolved(ss.state)) return err("Solve F2L first");
         if (!OLL::isSolved(ss.state)) return err("Orient the last layer first");
-        return "{\"case\":" + quoted(PLL::caseName(ss.state)) + ",\"moves\":" + moves(PLL::solve(ss.state)) + "}";
+        return "{\"case\":" + quoted(PLL::caseName(ss.state)) + ",\"moves\":" + moves(PLL::find(ss.state).notation) + "}";
     }
     // Cross Length per Sticker Colour
     if (cmd == "crosses") {
@@ -292,7 +300,7 @@ std::string handle(Session& ss, const std::string& cmd, std::map<std::string, st
     if (cmd == "cfop") {
         int color = q.count("color") ? std::stoi(q["color"]) : -1;
         if (color < -1 || color > 5) return err("color is 0 to 5, or -1 for the shortest");
-        return cfop(ss.state, ss.hold, color);
+        return cfop(ss.state, ss.hold, color, q["look"] == "2");
     }
     if (cmd == "kociemba") return "{\"moves\":" + moves(Kociemba::solve(ss.state)) + "}";
     // Timer commands, stateless: the cube a scramble reaches, and its analysis
@@ -313,6 +321,7 @@ EMSCRIPTEN_KEEPALIVE void engine_init() {
     F2L::buildTables();
     OLL::buildTables();
     PLL::buildTables();
+    TwoLook::buildTables();
 }
 
 // Runs one command against the tab's session and returns its JSON, an {"error": ...}

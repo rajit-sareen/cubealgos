@@ -63,7 +63,6 @@ export function App() {
   return (
     <div id="app" className={cls}>
       <header id="top">
-        <a className="brand" href="#/">cubealgos</a>
         <nav className="tabs">
           {ROUTES.filter(r => !r.icon).map(r => (
             <a key={r.path} href={'#/' + r.path} className={r === route ? 'on' : ''} aria-current={r === route ? 'page' : undefined}>{r.name}</a>

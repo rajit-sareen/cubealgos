@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type CSSProperties } from 'react';
 import { COLOR_VARS, CORNER_POS, EDGE_POS, FACE_LETTER, PATTERN_VARS, stickersOf, type Snap } from '../cube';
-import { sim, useSim, type Group } from '../sim';
+import { sim, useSim, type Group, type Look } from '../sim';
 
 // Case Card
 //
@@ -13,7 +13,7 @@ export function CaseCard() {
   const s = useSim();
   const cs = s.caseStep();
   const g = cs ? cs.g : null;
-  const [shown, setShown] = useState<{ g: Group; kind: 'oll' | 'pll' } | null>(null);
+  const [shown, setShown] = useState<{ g: Group; kind: 'oll' | 'pll'; look: Look } | null>(null);
   const [visible, setVisible] = useState(false);
   const visibleRef = useRef(visible);
   visibleRef.current = visible;
@@ -27,7 +27,7 @@ export function CaseCard() {
       const now = sim.caseStep();
       if (!now) return;
       at.current = { i: now.i, live: sim.following() };
-      setShown({ g: now.g, kind: now.kind });
+      setShown({ g: now.g, kind: now.kind, look: now.look });
       setVisible(true);
     };
     if (visibleRef.current) { setVisible(false); timer = window.setTimeout(show, 380); }
@@ -40,7 +40,7 @@ export function CaseCard() {
       {shown && shown.g.startSnap && <>
         <div className="cc-top">{shown.g.label}</div>
         <div className="cc-name">{shown.g.caseName || (shown.kind === 'pll' ? 'AUF only' : '')}</div>
-        <div className="cc-fig"><LastLayer s={shown.g.startSnap} kind={shown.kind} /></div>
+        <div className="cc-fig"><LastLayer s={shown.g.startSnap} kind={shown.kind} look={shown.look} /></div>
         <div className="cc-alg">
           {shown.g.tokens.map((t, j) => (
             <span key={j} className={'tok' + (j < at.current.i ? ' done' : j === at.current.i && at.current.live ? ' next' : '')}>{t}</span>
@@ -53,7 +53,10 @@ export function CaseCard() {
 
 // Top view of the U layer on a 5 by 5 grid, side stickers as the border strips
 // OLL shows only where the U colour is, PLL shows every colour and where pieces go
-function LastLayer({ s, kind }: { s: Snap; kind: 'oll' | 'pll' }) {
+//
+// The edge look of 2-look OLL leaves the corners grey, as its shapes are learnt without
+// them. The corner look needs no such thing, its edges are already oriented
+function LastLayer({ s, kind, look }: { s: Snap; kind: 'oll' | 'pll'; look: Look }) {
   const up = s.faces[0];
   const cells: Record<string, { c: number; top: boolean }> = { '2,2': { c: up, top: true } };
   for (const st of stickersOf(s)) {
@@ -65,28 +68,36 @@ function LastLayer({ s, kind }: { s: Snap; kind: 'oll' | 'pll' }) {
   const tiles = [];
   for (let r = 0; r < 5; r++) for (let c = 0; c < 5; c++) {
     const cell = cells[r + ',' + c];
-    const show = cell && (kind === 'pll' || cell.c === up);
+    const corner = r !== 2 && c !== 2;
+    const show = cell && (kind === 'pll' || (cell.c === up && !(look === 'edges' && corner)));
     if (show) tiles.push(<i key={r * 5 + c} className="st" style={{ '--c': COLOR_VARS[cell.c], '--p': PATTERN_VARS[cell.c] } as CSSProperties} />);
     else tiles.push(<i key={r * 5 + c} className={cell && cell.top ? 'st grey' : undefined} />);
   }
-  return <div className="ll">{tiles}{kind === 'pll' && <PllArrows s={s} />}</div>;
+  return <div className="ll">{tiles}{kind === 'pll' && <PllArrows s={s} look={look} />}</div>;
 }
 
 // One arrow per piece out of place, from its slot to its home; a swap is one line
 // headed at both ends
-function PllArrows({ s }: { s: Snap }) {
+//
+// A 2-look step solves one kind of piece and leaves the U turn for later, so its arrows
+// count from the turn that puts the most corners home rather than from the layer as held
+function PllArrows({ s, look }: { s: Snap; look: Look }) {
   const at = (p: number[]) => [15 + (p[0] + 1) * 32, 15 + (p[2] + 1) * 32];
   const lines: [number[], number[], boolean][] = [];
+  const home = (k: number) => [0, 1, 2, 3].filter(i => s.cp[i] === (i + k) % 4).length;
+  const turn = look === 'all' ? 0 : [0, 1, 2, 3].reduce((b, k) => home(k) > home(b) ? k : b, 0);
   const add = (POS: number[][], perm: number[]) => {
+    const to = (i: number) => perm[i] > 3 ? i : (perm[i] - turn + 4) % 4;
     for (let i = 0; i < 4; i++) {
-      const j = perm[i];
-      if (j === i || j > 3) continue;
-      const both = perm[j] === i;
+      const j = to(i);
+      if (j === i) continue;
+      const both = to(j) === i;
       if (both && j < i) continue;
       lines.push([at(POS[i]), at(POS[j]), both]);
     }
   };
-  add(CORNER_POS, s.cp); add(EDGE_POS, s.ep);
+  if (look !== 'edges') add(CORNER_POS, s.cp);
+  if (look !== 'corners') add(EDGE_POS, s.ep);
   return (
     <svg viewBox="0 0 94 94" fill="none">
       <defs>

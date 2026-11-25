@@ -1,5 +1,6 @@
 #include "Rotation.h"
 #include "MoveTable.h"
+#include <sstream>
 
 // Rotation Tables
 namespace {
@@ -228,6 +229,59 @@ static const CubeRot TO_BOTTOM[6] = {
 Orientation orientationWithBottom(int color) {
     if (color == 3) return Orientation{};
     return Orientation::fromRotation(TO_BOTTOM[color]);
+}
+
+// Written Turns
+
+// Every Turn That Moves Centres, Face Turns Then Rotation
+static const struct { char name; const char* moves; CubeRot rot; } CENTRE_TURNS[] = {
+    {'x', "",     CubeRot::x},
+    {'y', "",     CubeRot::y},
+    {'z', "",     CubeRot::z},
+    {'r', "L",    CubeRot::x},
+    {'l', "R",    CubeRot::xp},
+    {'u', "D",    CubeRot::y},
+    {'d', "U",    CubeRot::yp},
+    {'f', "B",    CubeRot::z},
+    {'b', "F",    CubeRot::zp},
+    {'M', "R L'", CubeRot::xp},  // Follows L
+    {'E', "U D'", CubeRot::yp},  // Follows D
+    {'S', "F' B", CubeRot::z},   // Follows F
+};
+
+// The layers involved all turn about one axis, so they commute with each other and with
+// the rotation, and a turn done n times is each part done n times
+Turn parseTurn(const std::string& s) {
+    Turn turn;
+    for (const auto& t : CENTRE_TURNS) {
+        if (s.empty() || s[0] != t.name) continue;
+        std::string suffix = s.substr(1);
+        if (suffix != "" && suffix != "2" && suffix != "'") break;
+        int times = suffix == "" ? 1 : suffix == "2" ? 2 : 3;
+        for (int i = 0; i < times; i++) turn.after = turn.after.then(t.rot);
+        for (Move m : parseSequence(t.moves)) {
+            if (suffix == "'") m = inverseMove(m);
+            if (suffix == "2") m = static_cast<Move>(static_cast<int>(m) / 3 * 3 + 1);
+            turn.moves.push_back(m);
+        }
+        return turn;
+    }
+    turn.moves.push_back(parseMove(s));
+    return turn;
+}
+
+std::vector<Move> parseWritten(const std::string& s, Orientation* after) {
+    std::vector<Move> moves;
+    Orientation hold;
+    std::istringstream in(s);
+    std::string tok;
+    while (in >> tok) {
+        Turn turn = parseTurn(tok);
+        for (Move m : turn.moves) moves.push_back(translateMove(m, hold));
+        hold = hold.then(turn.after);
+    }
+    if (after) *after = hold;
+    return moves;
 }
 
 // Names

@@ -6,9 +6,12 @@
 #include "../CubeState/CubeState.h"
 
 // One Named Step of a Solution
+// moves are in the scrambling frame. notation is the step as a solver turns it, wide and
+// slice turns included, each step read on from the hold the one before ended in
 struct Stage {
     std::string name;
     std::vector<Move> moves;
+    std::string notation;
 };
 
 // A solving method, one per directory under Solvers/
@@ -28,7 +31,7 @@ struct Method {
     std::vector<Stage> (*stages)(const CubeState& s);
 };
 
-extern const Method METHODS[3];
+extern const Method METHODS[4];
 extern const int METHOD_COUNT;
 
 #endif // METHOD_H

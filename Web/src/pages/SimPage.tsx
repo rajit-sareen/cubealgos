@@ -3,7 +3,7 @@ import { COLOR_NAMES, COLOR_VARS, PATTERN_VARS, pad3, tempoOf } from '../cube';
 import { STAGE_NAMES, sim, useSim, type Method, type OptKey } from '../sim';
 import { Viewport } from '../components/Viewport';
 
-// The 3D simulator: scramble, plan a CFOP or Kociemba solve, and play it move by move
+// The 3D simulator: scramble, plan a CFOP, 2-look CFOP or Kociemba solve, and play it move by move
 export function SimPage() {
   useEffect(() => sim.bindKeys(), []);
   return <>
@@ -45,10 +45,11 @@ function LeftPanel() {
         <div className="lbl">Method</div>
         <select value={s.method} onChange={e => sim.setMethod(e.target.value as Method)} aria-label="Method">
           <option value="cfop">CFOP</option>
+          <option value="cfop2">CFOP 2-look</option>
           <option value="kociemba">Kociemba</option>
         </select>
       </div>
-      {s.method === 'cfop' && <CrossPicker />}
+      {s.isCfop() && <CrossPicker />}
       <div className="blk">
         <div className="lbl">Tempo</div>
         <div className="tempo-read"><b>{t.name}</b><span>{t.turn ? `${t.turn} ms / move` : 'no animation'}</span></div>
@@ -59,17 +60,19 @@ function LeftPanel() {
         </div>
       </div>
       <div className="blk">
-        <div className="lbl">Turn</div>
-        <div className="keys">
-          {[...'URFDLB'].flatMap(f => ['', "'", '2'].map(suf => (
-            <button key={f + suf} onClick={() => sim.manual([f + suf])}>{f + suf}</button>
-          )))}
-        </div>
-        <div className="keys rot">
-          {[...'xyz'].flatMap(r => ['', "'", '2'].map(suf => (
-            <button key={r + suf} onClick={() => sim.manual([r + suf])}>{r + suf}</button>
-          )))}
-        </div>
+        <details>
+          <summary>Moves</summary>
+          <div className="keys">
+            {[...'URFDLB'].flatMap(f => ['', "'", '2'].map(suf => (
+              <button key={f + suf} onClick={() => sim.manual([f + suf])}>{f + suf}</button>
+            )))}
+          </div>
+          <div className="keys rot">
+            {[...'xyz'].flatMap(r => ['', "'", '2'].map(suf => (
+              <button key={r + suf} onClick={() => sim.manual([r + suf])}>{r + suf}</button>
+            )))}
+          </div>
+        </details>
       </div>
     </aside>
   );
@@ -105,7 +108,7 @@ function RightPanel() {
   const { plan, snap, playing } = s;
   const cur = snap ? s.currentStage() : null;
   const nt = s.nextToken();
-  const step = !snap ? '---' : s.method === 'cfop'
+  const step = !snap ? '---' : s.isCfop()
     ? (cur === 'f2l' ? `F2L ${snap.pairs.filter(Boolean).length}/4` : STAGE_NAMES[cur!])
     : (snap.solved ? 'Solved' : '---');
   const mode = !snap ? 'Loading' : playing ? 'Pause' : plan ? (plan.pos ? 'Resume' : 'Play') : snap.solved ? 'Scramble' : 'Solve';

@@ -1,6 +1,7 @@
 #include "CubeState/CubeAlgos.h"
 #include "Solvers/Method.h"
 #include "Scramblers/WCA.h"
+#include <sstream>
 
 #define RESET "\033[0m"
 #define BOLD  "\033[1m"
@@ -19,6 +20,16 @@ static void printMethods(int current) {
             std::cout << YELLOW << " (not implemented)" << RESET;
         std::cout << "\n";
     }
+}
+
+// Turns in a written sequence, rotations not counted
+static size_t turnCount(const std::string& written) {
+    size_t count = 0;
+    std::istringstream in(written);
+    std::string tok;
+    while (in >> tok)
+        if (tok[0] != 'x' && tok[0] != 'y' && tok[0] != 'z') count++;
+    return count;
 }
 
 // Read a method number, -1 if the user did not pick a new one
@@ -107,14 +118,15 @@ int main() {
 
         // Methods With Stages Solve Once and Print Both Views
         std::vector<Stage> stages;
-        std::vector<Move> solution;
+        std::string solution;
         auto start = std::chrono::high_resolution_clock::now();
         if (METHODS[method].stages) {
             stages = METHODS[method].stages(state);
             for (const Stage& stage : stages)
-                solution.insert(solution.end(), stage.moves.begin(), stage.moves.end());
+                if (!stage.notation.empty())
+                    solution += (solution.empty() ? "" : " ") + stage.notation;
         } else {
-            solution = METHODS[method].solve(state);
+            solution = sequenceName(METHODS[method].solve(state));
         }
         auto end   = std::chrono::high_resolution_clock::now();
 
@@ -123,7 +135,7 @@ int main() {
         // Replay the whole solution, so the check covers the printed sequence
         // rather than an intermediate state
         CubeState check = state;
-        for (auto m : solution)
+        for (auto m : parseWritten(solution))
             check = check.apply(m);
 
         bool solved = check.isSolved();
@@ -133,13 +145,13 @@ int main() {
                   << "Method:   " << RESET << METHODS[method].name << "\n";
         std::cout << BOLD << GREEN
                   << "Solution: " << RESET
-                  << sequenceName(solution) << "\n";
+                  << solution << "\n";
         for (const Stage& stage : stages)
             std::cout << "  " << BOLD << stage.name << ":" << RESET
                       << std::string(7 - stage.name.size(), ' ')
-                      << sequenceName(stage.moves) << "  (" << stage.moves.size() << ")\n";
+                      << stage.notation << "  (" << turnCount(stage.notation) << ")\n";
 
-        std::cout << BOLD << "Moves:    " << RESET << solution.size() << "\n";
+        std::cout << BOLD << "Moves:    " << RESET << turnCount(solution) << "\n";
         std::cout << BOLD << "Time:     " << RESET << ms << " ms\n";
         std::cout << BOLD << "Solved:   " << RESET
                   << (solved ? GREEN "YES" : RED "NO") << RESET << "\n\n";

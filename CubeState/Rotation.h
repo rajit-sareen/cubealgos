@@ -3,6 +3,7 @@
 
 #include <cstdint>
 #include <string>
+#include <vector>
 #include "CubeState.h"
 
 // One of the 24 ways to hold the cube
@@ -32,6 +33,24 @@ Move translateMove(Move m, const Orientation& o);
 // The orientation with a colour on the bottom, reached by one rotation from identity
 // color: 0=white 1=red 2=green 3=yellow 4=orange 5=blue
 Orientation orientationWithBottom(int color);
+
+// Any written turn, as face turns and then the rotation it leaves the cube held in
+//
+// A wide or slice turn carries centres, which a CubeState has none of, so it is the
+// opposite layers turned and the frame changed: r is L then x, M is R L' then x'
+struct Turn {
+    std::vector<Move> moves;
+    Orientation after;
+};
+
+// Face, wide (r), slice (M E S) or rotation (x y z), with ' or 2
+// Throws on anything else
+Turn parseTurn(const std::string& s);
+
+// A written sequence as face turns in the frame it starts from, the moves then being
+// the same whether or not the cube is rotated along the way
+// after, when given, gets the hold the sequence ends in
+std::vector<Move> parseWritten(const std::string& s, Orientation* after = nullptr);
 
 // Names
 const char* rotationName(CubeRot r);                     // "x2"

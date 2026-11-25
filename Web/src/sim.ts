@@ -1,15 +1,16 @@
 import { useSyncExternalStore } from 'react';
 import { api } from './engine';
 import {
-  AXIS_OF_FACE, CORNER_NAMES, CUBIES, GAP,
-  HOME_ORBIT, MOVE_RE, PEEK_OF_FACE, ROT_FACE, SCRAMBLE_TEMPO, clampX, ease,
+  AXIS_OF_FACE, CORNER_FACES, CORNER_NAMES, CUBIES, EDGE_FACES, GAP,
+  HOME_ORBIT, MOVE_RE, PEEK_OF_FACE, ROT_FACE, SCRAMBLE_TEMPO, SLICE_FACE, clampX, ease,
   faceVisible, tempoOf, wrap, type Kind, type Snap,
 } from './cube';
 
 export interface Group { label: string; tokens: string[]; caseName?: string; startSnap?: Snap }
 export interface Plan { groups: Group[]; pos: number; total: number }
 export type Stage = 'cross' | 'f2l' | 'oll' | 'pll' | 'done';
-export type Method = 'cfop' | 'kociemba';
+export type Method = 'cfop' | 'cfop2' | 'kociemba';
+export type Look = 'all' | 'edges' | 'corners';  // Last Layer Pieces a Step Solves
 interface Opts {
   turn: number; gap: number;
   dim: boolean; grey: boolean; card: boolean; cam: boolean; idle: boolean; rgb: boolean; modern: boolean;
@@ -269,7 +270,7 @@ class Sim {
   // out and put them back, and the live flags would grey them out on the way
   stagePieces() {
     const set = new Set<string>();
-    if (this.method !== 'cfop' || !this.following() || !this.plan) return set;
+    if (!this.isCfop() || !this.following() || !this.plan) return set;
     const cur = this.currentStage();
     const add = (kind: Kind, piece: number) => set.add(kind + piece);
     if (cur === 'cross') [4,5,6,7].forEach(p => add('e', p));
@@ -282,8 +283,25 @@ class Sim {
       for (const k of slots) { add('c', 4 + k); add('e', 8 + k); }
       for (const k of [0,1,2,3]) if (done[k]) { add('c', 4 + k); add('e', 8 + k); }
     }
-    if (cur === 'oll' || cur === 'pll') [0,1,2,3].forEach(k => { add('c', k); add('e', k); });
+    if (cur === 'oll' || cur === 'pll') {
+      const { g } = this.groupAt(this.plan.pos);
+      [0,1,2,3].forEach(k => {
+        add('c', this.pieceNow('c', k, g.startSnap));
+        add('e', this.pieceNow('e', k, g.startSnap));
+      });
+    }
     return set;
+  }
+
+  // Pieces are numbered by where they belong in the current frame, and a wide or slice
+  // turn changes the frame partway through an alg. This is the number now of a piece
+  // numbered in the frame its step started in, matched by its colours
+  private pieceNow(kind: 'c' | 'e', piece: number, from: Snap | undefined) {
+    if (!from) return piece;
+    const FACES = kind === 'c' ? CORNER_FACES : EDGE_FACES;
+    const colors = (s: Snap, p: number) => FACES[p].map(f => s.faces[f]).sort().join();
+    const want = colors(from, piece);
+    return FACES.findIndex((_, p) => colors(this.snap!, p) === want);
   }
 
   groupStart(g: Group) {
@@ -301,9 +319,10 @@ class Sim {
   caseStep() {
     if (!this.plan || !this.opts.card) return null;
     const { g } = this.groupAt(this.plan.pos);
-    const kind = g.label === 'OLL' ? 'oll' as const : g.label === 'PLL' ? 'pll' as const : null;
+    const kind = g.label.startsWith('OLL') ? 'oll' as const : g.label.startsWith('PLL') ? 'pll' as const : null;
     if (!kind || !g.startSnap) return null;
-    return { g, kind, i: this.plan.pos - this.groupStart(g) };
+    const look: Look = g.label.endsWith('edges') ? 'edges' : g.label.endsWith('corners') ? 'corners' : 'all';
+    return { g, kind, look, i: this.plan.pos - this.groupStart(g) };
   }
   planTokens() { return this.plan ? this.plan.groups.flatMap(g => g.tokens) : []; }
   nextToken() { return this.plan && this.plan.pos < this.plan.total ? this.planTokens()[this.plan.pos] : null; }
@@ -312,13 +331,15 @@ class Sim {
   private animateTurn(tok: string) {
     if (this.opts.turn <= 0) return Promise.resolve();
     const isRot = 'xyz'.includes(tok[0]);
-    const face = isRot ? ROT_FACE[tok[0]] : tok[0];
+    const slice = SLICE_FACE[tok[0]];
+    const face = isRot ? ROT_FACE[tok[0]] : slice ?? tok[0].toUpperCase();
+    const wide = !isRot && !slice && tok[0] !== face;
     const [axis, css, sign] = AXIS_OF_FACE[face];
     const turns = tok.endsWith('2') ? 2 : 1, dir = tok.endsWith("'") ? -1 : 1;
     const side = 'URF'.includes(face) ? 1 : -1;
     const angle = 90 * turns * dir * sign;
     const layer = CUBIES.map((c, i) => ({ c, el: this.cubieEls[i] }))
-      .filter(({ c, el }) => el && (isRot || c.pos[axis] === side));
+      .filter(({ c, el }) => el && (isRot || (slice ? c.pos[axis] === 0 : wide ? c.pos[axis] !== -side : c.pos[axis] === side)));
     const dur = this.opts.turn * (turns === 2 ? 1.5 : 1);
     return new Promise<void>(res => {
       const t0 = performance.now();
@@ -383,7 +404,7 @@ class Sim {
   step = async () => {
     const t = this.nextToken(); if (!t) return false;
     if (this.opts.cam && !this.cam.drag) {
-      const face = 'xyz'.includes(t[0]) ? null : t[0];
+      const face = 'xyzMES'.includes(t[0]) ? null : t[0].toUpperCase();
       const want = face && (PEEK_OF_FACE[face] || HOME_ORBIT);
       if (face && want && !this.visible(face) && !this.nearOrbit(want)) {
         this.cam.target = { ...want };
@@ -443,7 +464,7 @@ class Sim {
     if (this.opts.cam && !this.visible('F')) this.cam.target = { ...HOME_ORBIT };
     if (this.method === 'kociemba') return (await this.kociemba()) != null;
     this.status('Searching');
-    const r = await api<Err & { rotation: string; steps: { label: string; case: string; moves: string[] }[] }>('cfop', { color: this.cross ?? -1 });
+    const r = await api<Err & { rotation: string; steps: { label: string; case: string; moves: string[] }[] }>('cfop', { color: this.cross ?? -1, look: this.method === 'cfop2' ? 2 : 1 });
     if (this.fail(r)) return false;
     const rot = r.rotation ? r.rotation.split(' ') : [];
     this.setPlan(r.steps.map((s, i) => ({ label: s.label, tokens: i === 0 ? [...rot, ...s.moves] : s.moves, caseName: s.case })));
@@ -458,7 +479,7 @@ class Sim {
   // Cross lengths for the cube a pick would plan from, which stays put while a plan plays
   private async refreshCrosses() {
     const s = this.snap;
-    if (!s || this.base || this.method !== 'cfop') return;
+    if (!s || this.base || !this.isCfop()) return;
     const key = s.solved ? '' : JSON.stringify([s.cp, s.co, s.ep, s.eo, s.hold]);
     if (key === this.crossKey) return;
     this.crossKey = key;
@@ -487,7 +508,7 @@ class Sim {
   // A timer solve's scramble, put on the cube at once and planned, ready to play
   loadScramble(moves: string[]) {
     this.escape();
-    this.method = 'cfop';
+    if (!this.isCfop()) this.method = 'cfop';
     this.run(async () => {
       const r = await api<Snap & Err>('reset'); if (this.fail(r)) return;
       this.snap = r;
@@ -542,6 +563,7 @@ class Sim {
     this.refreshCrosses();
   }
 
+  isCfop() { return this.method !== 'kociemba'; }
   setMethod(m: Method) { this.method = m; this.plan = this.base = null; this.render(); this.refreshCrosses(); }
   setOpt(key: OptKey, on: boolean) { this.opts[key] = on; store.set(key, on ? '1' : '0'); this.notify(); }
   setTempo(v: number) {
@@ -553,8 +575,9 @@ class Sim {
   // Keyboard: face letters turn (Shift for prime), x y z rotate, Space drives the solve,
   // arrows step, Escape drops the plan
   bindKeys() {
-    // A clicked button must not keep focus, or the next Space would click it again
-    const click = (e: MouseEvent) => { const b = (e.target as HTMLElement).closest('button'); if (b) b.blur(); };
+    // A clicked button or dropdown must not keep focus, or the next Space would click it
+    // again
+    const click = (e: MouseEvent) => { const b = (e.target as HTMLElement).closest<HTMLElement>('button, summary'); if (b) b.blur(); };
     const key = (e: KeyboardEvent) => {
       const tag = (e.target as HTMLElement).tagName;
       if (tag === 'INPUT' || tag === 'SELECT' || tag === 'SUMMARY' || e.metaKey || e.ctrlKey || e.altKey) return;
@@ -580,7 +603,8 @@ class Sim {
     this.setTempo(tempo != null && tempo !== '' && !isNaN(+tempo) && +tempo <= 100 ? +tempo : 50);
     for (const k of ['dim', 'card', 'cam', 'idle', 'rgb', 'modern'] as const) if (store.get(k) === '0') this.opts[k] = false;
     this.opts.grey = store.get('grey') === '1';
-    if (QS.get('method') === 'kociemba') this.method = 'kociemba';
+    const method = QS.get('method');
+    if (method === 'kociemba' || method === 'cfop2') this.method = method;
     if (QS.get('orbit')) { const [x, y] = QS.get('orbit')!.split(',').map(Number); this.orbit = { x, y }; }
     this.status('Loading engine');
     const s = await api<Snap & Err>('state');

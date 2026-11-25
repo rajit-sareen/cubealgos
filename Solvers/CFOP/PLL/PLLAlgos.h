@@ -1,25 +1,19 @@
 #ifndef PLL_ALGOS_H
 #define PLL_ALGOS_H
 
-#include <string>
+#include "../CaseTable.h"
 
 // One Alg per Case
-// Face turns only, slice moves rewritten so the parser takes them
-struct PLLAlgo {
-    std::string name;
-    std::string moves;
-};
-
-const PLLAlgo PLL_ALGS[] = {
-    {"Aa", "R' F R' B2 R F' R' B2 R2"},
-    {"Ab", "R2 B2 R F R' B2 R F' R"},
-    {"E",  "R B' R' F R B R' F' R B R' F R B' R' F'"},
+const CaseAlgo PLL_ALGS[] = {
+    {"Aa", "x R' U R' D2 R U' R' D2 R2 x'"},
+    {"Ab", "x R2 D2 R U R' D2 R U' R x'"},
+    {"E",  "x' R U' R' D R U R' D' R U R' D R U' R' D' x"},
     {"F",  "R' U' F' R U R' U' R' F R2 U' R' U' R U R' U R"},
     {"Ga", "R2 U R' U R' U' R U' R2 U' D R' U R D'"},
     {"Gb", "R' U' R U D' R2 U R' U R U' R U' R2 D"},
     {"Gc", "R2 U' R U' R U R' U R2 U D' R U' R' D"},
     {"Gd", "R U R' U' D R2 U' R U' R' U R' U R2 D'"},
-    {"H",  "R2 U2 R U2 R2 U2 R2 U2 R U2 R2"},
+    {"H",  "M2 U M2 U2 M2 U M2"},
     {"Ja", "L' U' L F L' U' L U L F' L2 U L"},
     {"Jb", "R U R' F' R U R' U' R' F R2 U' R'"},
     {"Na", "R U R' U R U R' F' R U R' U' R' F R2 U' R' U2 R U' R'"},
@@ -27,11 +21,11 @@ const PLLAlgo PLL_ALGS[] = {
     {"Ra", "R U' R' U' R U R D R' U' R D' R' U2 R'"},
     {"Rb", "R' U2 R U2 R' F R U R' U' R' F' R2"},
     {"T",  "R U R' U' R' F R2 U' R' U' R U R' F'"},
-    {"Ua", "R U' R U R U R U' R' U' R2"},
-    {"Ub", "R2 U R U R' U' R' U' R' U R'"},
+    {"Ua", "M2 U M U2 M' U M2"},
+    {"Ub", "M2 U' M U2 M' U' M2"},
     {"V",  "R' U R' U' B' R' B2 U' B' U B' R B R"},
     {"Y",  "F R U' R' U' R U R' F' R U R' U' R' F R F'"},
-    {"Z",  "R2 L2 D R2 L2 U R' L F2 R2 L2 B2 R' L"},
+    {"Z",  "M' U M2 U M2 U M' U2 M2"},
 };
 
 #endif // PLL_ALGOS_H

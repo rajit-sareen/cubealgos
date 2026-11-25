@@ -21,7 +21,8 @@ export const HOME_ORBIT = { x: -28, y: -38 };
 // face only gets a lean that keeps the front in front while its layer shows
 export const PEEK_OF_FACE: Record<string, { x: number; y: number }> =
   { L: { x: -28, y: 24 }, B: { x: -56, y: -38 }, D: { x: 14, y: -38 } };
-export const MOVE_RE = /^([URFDLB](2|')?|[xyz](2|')?)$/;
+export const SLICE_FACE: Record<string, string> = { M: 'L', E: 'D', S: 'F' };  // Face Each Slice Follows
+export const MOVE_RE = /^[URFDLBurfdlbMESxyz](2|')?$/;
 
 // Tempo 0 to 100: turn time falls from 900ms to nothing, the pause between moves
 // with it; the names are the bands the slider's ticks mark
