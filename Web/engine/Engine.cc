@@ -158,7 +158,7 @@ CrossResult crossOn(const CubeState& s, const Orientation& hold, int color) {
 // Every stage in the cross frame, so the page shows the rotation once and the moves
 // as a solver holding the cube would make them. A color of -1 takes the shortest cross
 std::string cfop(const CubeState& start, const Orientation& hold, int color = -1,
-                 bool twoLook = false) {
+                 bool twoLookOll = false, bool twoLookPll = false) {
     CrossResult cross = color < 0 ? Cross::bestCross(start) : crossOn(start, hold, color);
     CubeState s = start.rotate(cross.hold);
     auto run = [&](const std::vector<Move>& m) { for (Move x : m) s = s.apply(x); return m; };
@@ -181,10 +181,10 @@ std::string cfop(const CubeState& start, const Orientation& hold, int color = -1
         run(c.moves);
         out += "," + step(label, c.notation, c.name);
     };
-    if (twoLook) look("OLL edges", TwoLook::orientEdges(s));
-    look(twoLook ? "OLL corners" : "OLL", OLL::find(s));
-    if (twoLook) look("PLL corners", TwoLook::permuteCorners(s));
-    look(twoLook ? "PLL edges" : "PLL", PLL::find(s));
+    if (twoLookOll) look("OLL edges", TwoLook::orientEdges(s));
+    look(twoLookOll ? "OLL corners" : "OLL", OLL::find(s));
+    if (twoLookPll) look("PLL corners", TwoLook::permuteCorners(s));
+    look(twoLookPll ? "PLL edges" : "PLL", PLL::find(s));
     return out + "]}";
 }
 
@@ -199,8 +199,7 @@ CubeState scrambled(const std::string& scramble) {
 // A timer solve looked at from its scramble alone, touching no session
 //
 // The cross on every colour shows what colour neutrality would have saved on this
-// scramble. The CFOP solve is the engine's own path, so its OLL and PLL cases are a
-// reference, not the cases the solver met after their own F2L
+// scramble
 std::string analyze(const std::string& scramble) {
     CubeState s = scrambled(scramble);
     std::string out = "{\"crosses\":[";
@@ -212,7 +211,7 @@ std::string analyze(const std::string& scramble) {
     }
     Session view;
     view.state = s;
-    return out + "],\"cfop\":" + cfop(s, Orientation{}) + ",\"state\":" + snapshot(view) + "}";
+    return out + "],\"state\":" + snapshot(view) + "}";
 }
 
 std::string handle(Session& ss, const std::string& cmd, std::map<std::string, std::string>& q) {
@@ -306,10 +305,11 @@ std::string handle(Session& ss, const std::string& cmd, std::map<std::string, st
             out += (c ? "," : "") + std::to_string(crossOn(ss.state, ss.hold, c).moves.size());
         return out + "]}";
     }
+    // oll=2 and pll=2 each take that half of the last layer in two looks
     if (cmd == "cfop") {
         int color = q.count("color") ? std::stoi(q["color"]) : -1;
         if (color < -1 || color > 5) return err("color is 0 to 5, or -1 for the shortest");
-        return cfop(ss.state, ss.hold, color, q["look"] == "2");
+        return cfop(ss.state, ss.hold, color, q["oll"] == "2", q["pll"] == "2");
     }
     if (cmd == "kociemba") return "{\"moves\":" + moves(Kociemba::solve(ss.state)) + "}";
     // Timer commands, stateless: the cube a scramble reaches, and its analysis

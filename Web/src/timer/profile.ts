@@ -1,4 +1,5 @@
 import type { CrossColor } from './timer';
+import type { Method as SimMethod } from '../sim';
 
 export type Method = 'beginner' | 'cfop' | 'roux';
 export type Look = '2-look' | 'full';
@@ -43,6 +44,17 @@ export function levelOf(p: Profile): Level | null {
   if (p.method === 'roux') return null;
   return LEVELS.find(l => l.profile.method === p.method
     && (p.method === 'beginner' || (l.profile.oll === p.oll && l.profile.pll === p.pll))) ?? null;
+}
+
+// The simulator's solve nearest the profile, for analysing its solves
+//
+// The beginner method has no solver of its own, and its last layer is learnt as 2-look
+// first, so it comes closest. Roux has none either, and keeps whatever the simulator has
+export function simMethod(p: Profile): SimMethod | undefined {
+  if (p.method === 'roux') return undefined;
+  if (p.method === 'beginner') return 'cfop2';
+  const oll = p.oll === '2-look', pll = p.pll === '2-look';
+  return oll && pll ? 'cfop2' : oll ? 'cfop2oll' : pll ? 'cfop2pll' : 'cfop';
 }
 
 // Full OLL with 2-look PLL, saved by an earlier build, has no rung, so it is spelt out

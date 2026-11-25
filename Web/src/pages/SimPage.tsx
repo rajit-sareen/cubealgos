@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, type CSSProperties } from 'react';
 import { COLOR_NAMES, COLOR_VARS, PATTERN_VARS, pad3, tempoOf } from '../cube';
-import { STAGE_NAMES, sim, useSim, type Method, type OptKey } from '../sim';
+import { METHOD_LABELS, STAGE_NAMES, sim, useSim, type Method, type OptKey } from '../sim';
 import { Viewport } from '../components/Viewport';
 
 // The 3D simulator: scramble, plan a CFOP, 2-look CFOP or Kociemba solve, and play it move by move
@@ -44,9 +44,7 @@ function LeftPanel() {
       <div className="blk">
         <div className="lbl">Method</div>
         <select value={s.method} onChange={e => sim.setMethod(e.target.value as Method)} aria-label="Method">
-          <option value="cfop">CFOP</option>
-          <option value="cfop2">CFOP 2-look</option>
-          <option value="kociemba">Kociemba</option>
+          {Object.entries(METHOD_LABELS).map(([m, name]) => <option key={m} value={m}>{name}</option>)}
         </select>
       </div>
       {s.isCfop() && <CrossPicker />}

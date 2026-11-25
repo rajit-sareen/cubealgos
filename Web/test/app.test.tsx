@@ -52,6 +52,21 @@ it('opens a solve and analyzes it in the simulator', async () => {
   expect($('.modal')).toBeNull();
   expect(sim.scrambleMoves).toEqual(scramble);
   expect([...document.querySelectorAll('.crosses button:not(.any) b')].map(x => x.textContent)).toEqual(lengths);
+  // The Default Profile: 2-Look Throughout, No Cross Colour Yet
+  expect(sim.method).toBe('cfop2');
+  expect(sim.cross).toBeNull();
+});
+
+it('analyzes on the method and cross colour of the profile', async () => {
+  timer.setProfile({ method: 'cfop', oll: 'full', pll: 'full', cross: 'blue' });
+  await go('#/', '#main.timer');
+  $('table.solves tbody tr')!.click();
+  await vi.waitFor(() => expect($('.modal')).not.toBeNull());
+  button('Analyze solve').click();
+  await vi.waitFor(() => expect(text('#seq .g')).toContain('blue cross'));
+  expect(($('#left select') as HTMLSelectElement).value).toBe('cfop');
+  expect(text('#seq')).not.toContain('OLL edges');
+  timer.setProfile({ oll: '2-look', pll: '2-look', cross: null });
 });
 
 it('changes cross and method on the same scramble', async () => {
@@ -62,7 +77,7 @@ it('changes cross and method on the same scramble', async () => {
   const scramble = text('#scrambleTokens');
   button('All', '#right').click();
   await vi.waitFor(() => expect(text('#left .val')).toBe('Solved'));
-  choose('cfop2');
+  choose('cfop2oll');
   await vi.waitFor(() => expect(text('#seq')).toContain('orange cross'));
   expect(text('#left .val')).toBe('Solution ready');
   choose('kociemba');
@@ -72,7 +87,7 @@ it('changes cross and method on the same scramble', async () => {
 });
 
 it('drives the solve with Space after the moves dropdown is clicked', async () => {
-  choose('cfop');
+  choose('cfop2');
   await vi.waitFor(() => expect(text('#seq')).toContain('cross'));
   const summary = $('#left summary')!;
   summary.focus();

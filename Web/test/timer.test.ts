@@ -4,6 +4,8 @@ import { DNF, averageOf, fmt, fmtSolve, result, sessionStats, stageTimes } from 
 import { crossLook, stageSummary } from '../src/timer/insights';
 import { LEVELS, levelOf, profileName } from '../src/timer/profile';
 import { timer } from '../src/timer/timer';
+import * as db from '../src/timer/db';
+import { simMethod } from '../src/timer/profile';
 
 const solve = (time: number, more: Partial<Solve> = {}): Solve =>
   ({ id: String(Math.random()), session: 's', time, penalty: 'ok', scramble: 'R U', date: 0, ...more });
@@ -55,6 +57,15 @@ it('compares crosses by colour', () => {
   expect(crossLook(a, 'neutral')).toMatchObject({ pref: 3, prefColor: 'yellow' });
 });
 
+it('picks the simulator method nearest the profile', () => {
+  const p = (method: 'beginner' | 'cfop' | 'roux', oll: '2-look' | 'full', pll: '2-look' | 'full') =>
+    simMethod({ method, oll, pll, cross: null });
+  expect([p('cfop', 'full', 'full'), p('cfop', '2-look', '2-look'), p('cfop', '2-look', 'full'), p('cfop', 'full', '2-look')])
+    .toEqual(['cfop', 'cfop2', 'cfop2oll', 'cfop2pll']);
+  expect(p('beginner', 'full', 'full')).toBe('cfop2');
+  expect(p('roux', 'full', 'full')).toBeUndefined();
+});
+
 it('names every profile level, and Roux outside them', () => {
   for (const l of LEVELS) expect(levelOf({ ...l.profile, cross: null })).toBe(l);
   expect(levelOf({ method: 'roux', oll: 'full', pll: 'full', cross: null })).toBeNull();
@@ -71,7 +82,10 @@ describe('timer', () => {
   };
 
   it('times, analyses, exports and reimports a solve', async () => {
+    // A Solve Saved by an Earlier Build, Analysis and All
+    await db.put('solves', { ...solve(9000), id: 'old', analysis: { crosses: [] } } as Solve);
     await timer.boot();
+    expect((await db.allSolves()).find(s => s.id === 'old')).not.toHaveProperty('analysis');
     timer.setSetting('holdMs', 0);
     const scramble = timer.scramble || (await expect.poll(() => timer.scramble).not.toBe(''), timer.scramble);
     await time();
@@ -82,7 +96,8 @@ describe('timer', () => {
 
     const id = timer.solves[0].id;
     expect((await timer.analysis(id))!.crosses).toHaveLength(6);
-    expect(timer.solves[0].analysis).toBeDefined();
+    expect(timer.analysisOf(timer.solves[0])!.crosses).toHaveLength(6);
+    expect(JSON.stringify(await db.allSolves())).not.toContain('crosses');
 
     const file = await timer.exportAll();
     expect(file).not.toContain('analysis');

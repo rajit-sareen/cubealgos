@@ -3,10 +3,11 @@ import type { Method } from './profile';
 
 export type Penalty = 'ok' | '+2' | 'dnf';
 
-// The engine's look at a solve's scramble, stored with the solve once computed
+// The engine's look at a solve's scramble: the optimal cross on every colour and the cube
+// it leaves. Worked out when a page needs it and never stored, as the scramble alone
+// gives it back
 export interface Analysis {
   crosses: { color: string; rotation: string; moves: string[] }[];
-  cfop: { rotation: string; steps: { label: string; case: string; moves: string[] }[] };
   state: Snap;
 }
 
@@ -19,7 +20,6 @@ export interface Solve {
   date: number;
   splits?: number[];     // Cumulative ms at the End of the First Three Stages
   method?: Method;       // Method the Splits Were Tapped For, CFOP When Missing
-  analysis?: Analysis;
 }
 
 export interface Session { id: string; name: string; created: number }

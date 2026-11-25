@@ -90,6 +90,9 @@ class Timer {
     if (this.booted) return;
     this.booted = true;
     this.saved = await db.persistent();
+    // Earlier builds saved each solve's analysis with it
+    const heavy = (await db.allSolves()).filter(s => 'analysis' in s);
+    if (heavy.length) await db.put('solves', ...heavy.map(withoutAnalysis));
     this.sessions = (await db.allSessions()).sort((a, b) => a.created - b.created);
     if (!this.sessions.length) {
       const s = { id: db.newId(), name: 'Session 1', created: Date.now() };
@@ -160,26 +163,26 @@ class Timer {
     this.notify();
   }
 
-  // Each analysis is one engine call, kept with the solve so it runs once
+  // Each analysis is one engine call, kept for the visit by scramble so it runs once and
+  // then never saved: a reload works it out again when a page asks
+  private analyses = new Map<string, Analysis>();
+  analysisOf(s: Solve) { return this.analyses.get(s.scramble); }
   async analysis(id: string): Promise<Analysis | null> {
     const s = this.solves.find(x => x.id === id) ?? this.everything?.find(x => x.id === id);
     if (!s) return null;
-    if (s.analysis) return s.analysis;
+    const known = this.analyses.get(s.scramble);
+    if (known) return known;
     const a = await api<Analysis & { error?: string }>('analyze', { scramble: s.scramble });
     if (a.error) return null;
-    const r = { ...s, analysis: a };
-    if (this.everything) this.everything = this.everything.map(x => x.id === id ? r : x);
-    // The session may have changed while the engine ran
-    if (this.solves.some(x => x.id === id)) this.setSolves(this.solves.map(x => x.id === id ? r : x));
-    else this.notify();
-    await db.put('solves', r);
+    this.analyses.set(s.scramble, a);
+    this.notify();
     return a;
   }
   analyzing = { done: 0, total: 0 };
   private analyzeRun = 0;
   async analyzeAll(solves: Solve[] = this.solves) {
     const run = ++this.analyzeRun;
-    const todo = solves.filter(s => !s.analysis).map(s => s.id);
+    const todo = solves.filter(s => !this.analyses.has(s.scramble)).map(s => s.id);
     this.analyzing = { done: 0, total: todo.length };
     this.notify();
     for (const id of todo) {
@@ -193,7 +196,7 @@ class Timer {
   async exportAll() {
     const solves = await db.allSolves();
     return JSON.stringify({ format: 'cubealgos-timer', version: 1, sessions: this.sessions,
-      solves: solves.map(({ analysis: _, ...s }) => s) }, null, 1);
+      solves: solves.map(withoutAnalysis) }, null, 1);
   }
   // Imported solves keep their ids, so importing the same file twice adds nothing
   async importJson(text: string) {
@@ -206,7 +209,7 @@ class Timer {
       s && s.id && known.has(s.session) && typeof s.time === 'number' && typeof s.scramble === 'string'
       && ['ok', '+2', 'dnf'].includes(s.penalty));
     await db.put('sessions', ...sessions);
-    await db.put('solves', ...solves);
+    await db.put('solves', ...solves.map(withoutAnalysis));
     const have = new Set(this.sessions.map(s => s.id));
     this.sessions = [...this.sessions, ...sessions.filter(s => !have.has(s.id))].sort((a, b) => a.created - b.created);
     await this.selectSession(this.sessionId);
@@ -338,6 +341,12 @@ class Timer {
     return last ? fmtSolve(last) : '0.00';
   }
   last() { return this.solves[this.solves.length - 1] ?? null; }
+}
+
+// A solve as saved, without the analysis earlier builds kept on it
+function withoutAnalysis(s: Solve): Solve {
+  const { analysis: _, ...rest } = s as Solve & { analysis?: unknown };
+  return rest;
 }
 
 export const timer = new Timer();

@@ -50,7 +50,8 @@ const pct = (x: number) => Math.round(x * 100) + '%';
 // careful version
 
 // What to work on across a session, most time to gain first
-export function sessionInsights(solves: Solve[], color: CrossColor): Insight[] {
+export function sessionInsights(solves: Solve[], color: CrossColor,
+                                analysisOf: (s: Solve) => Analysis | undefined): Insight[] {
   const out: Insight[] = [];
   const results = solves.map(result);
   const m = mean(results);
@@ -78,7 +79,7 @@ export function sessionInsights(solves: Solve[], color: CrossColor): Insight[] {
   }
 
   // Cross Colour
-  const looks = solves.filter(s => s.analysis).map(s => crossLook(s.analysis!, color));
+  const looks = solves.map(analysisOf).filter((a): a is Analysis => !!a).map(a => crossLook(a, color));
   if (looks.length >= 5 && color !== 'neutral') {
     const avg = (f: (l: CrossLook) => number) => looks.reduce((a, l) => a + f(l), 0) / looks.length;
     const pref = avg(l => l.pref), dual = avg(l => l.dual), best = avg(l => l.best);

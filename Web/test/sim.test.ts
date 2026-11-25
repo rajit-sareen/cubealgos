@@ -29,6 +29,16 @@ describe('loadScramble', () => {
     expect(sim.crosses).toHaveLength(6);
   });
 
+  it('takes the method and cross asked for', async () => {
+    sim.loadScramble(SCRAMBLE, { method: 'cfop2oll', cross: 5 });
+    await settle();
+    expect(labels()).toEqual(['blue cross', ...labels().slice(1, -3), 'OLL edges', 'OLL corners', 'PLL']);
+    sim.loadScramble(SCRAMBLE, { method: 'cfop2pll', cross: null });
+    await settle();
+    expect(labels()[0]).toBe('green cross');
+    expect(labels().slice(-3)).toEqual(['OLL', 'PLL corners', 'PLL edges']);
+  });
+
   it('keeps 2-look but leaves Kociemba, which has no crosses', async () => {
     sim.method = 'cfop2';
     await load();

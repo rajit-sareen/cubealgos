@@ -50,8 +50,8 @@ export function StatsPage() {
   useEffect(() => { if (t.loaded) timer.loadEverything(); }, [t.loaded, t.sessionId, t.sessions.length, changed]);
   const solves = all ? t.everything ?? NONE : t.solves;
 
-  // Cross analysis needs every scramble through the engine once; it runs in the
-  // background and each result is stored with its solve
+  // Cross analysis needs every scramble through the engine once a visit; it runs in the
+  // background and is kept in memory only
   useEffect(() => { if (t.loaded) timer.analyzeAll(solves); }, [t.loaded, scope, t.sessionId, solves.length]);
 
   const st = useMemo(() => all ? sessionStats(solves) : t.stats, [all, solves, t.stats]);
@@ -60,10 +60,10 @@ export function StatsPage() {
   const color = t.crossColor(), hasCross = HAS_CROSS[t.profile.method];
   const stages = METHOD_STAGES[t.profile.method];
   const splits = stageSummary(solves, t.profile.method);
-  const analysed = solves.filter(s => s.analysis);
-  const looks = analysed.map(s => crossLook(s.analysis!, color));
+  const analysed = solves.map(s => timer.analysisOf(s)).filter(a => !!a);
+  const looks = analysed.map(a => crossLook(a, color));
   const avgLen = Object.fromEntries(['white', 'yellow', 'green', 'blue', 'red', 'orange'].map(c => [c,
-    analysed.length ? analysed.reduce((a, s) => a + s.analysis!.crosses.find(x => x.color === c)!.moves.length, 0) / analysed.length : 0]));
+    analysed.length ? analysed.reduce((n, a) => n + a.crosses.find(x => x.color === c)!.moves.length, 0) / analysed.length : 0]));
   const avg = (f: (l: ReturnType<typeof crossLook>) => number) => looks.length ? looks.reduce((a, l) => a + f(l), 0) / looks.length : 0;
   const busy = t.analyzing.total > 0 && t.analyzing.done < t.analyzing.total;
   const tile = (label: string, v: number | null, sub?: string) => (

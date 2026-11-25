@@ -9,7 +9,15 @@ import {
 export interface Group { label: string; tokens: string[]; caseName?: string; startSnap?: Snap }
 export interface Plan { groups: Group[]; pos: number; total: number }
 export type Stage = 'cross' | 'f2l' | 'oll' | 'pll' | 'done';
-export type Method = 'cfop' | 'cfop2' | 'kociemba';
+export type Method = 'cfop' | 'cfop2' | 'cfop2oll' | 'cfop2pll' | 'kociemba';
+// Which halves of the last layer each CFOP takes in two looks
+const LOOKS: Record<Method, { oll: number; pll: number }> = {
+  cfop: { oll: 1, pll: 1 }, cfop2: { oll: 2, pll: 2 }, cfop2oll: { oll: 2, pll: 1 }, cfop2pll: { oll: 1, pll: 2 },
+  kociemba: { oll: 1, pll: 1 },
+};
+export const METHOD_LABELS: Record<Method, string> = {
+  cfop: 'CFOP', cfop2: 'CFOP 2-look', cfop2oll: 'CFOP 2-look OLL', cfop2pll: 'CFOP 2-look PLL', kociemba: 'Kociemba',
+};
 export type Look = 'all' | 'edges' | 'corners';  // Last Layer Pieces a Step Solves
 interface Opts {
   turn: number; gap: number;
@@ -491,7 +499,7 @@ class Sim {
     if (this.opts.cam && !this.visible('F')) this.cam.target = { ...HOME_ORBIT };
     if (this.method === 'kociemba') return (await this.kociemba()) != null;
     this.status('Searching');
-    const r = await api<Err & { rotation: string; steps: { label: string; case: string; moves: string[] }[] }>('cfop', { color: this.cross ?? -1, look: this.method === 'cfop2' ? 2 : 1 });
+    const r = await api<Err & { rotation: string; steps: { label: string; case: string; moves: string[] }[] }>('cfop', { color: this.cross ?? -1, ...LOOKS[this.method] });
     if (this.fail(r)) return false;
     const rot = r.rotation ? r.rotation.split(' ') : [];
     this.setPlan(r.steps.map((s, i) => ({ label: s.label, tokens: i === 0 ? [...rot, ...s.moves] : s.moves, caseName: s.case })));
@@ -542,9 +550,11 @@ class Sim {
   pickCross(color: number | null) { this.cross = color; this.replan(); }
 
   // A timer solve's scramble, put on the cube at once and planned, ready to play
-  loadScramble(moves: string[]) {
+  // as given, or with the CFOP in use and its cross picker, Kociemba having none
+  loadScramble(moves: string[], as: { method?: Method; cross?: number | null } = {}) {
     this.escape();
-    if (!this.isCfop()) this.method = 'cfop';
+    this.method = as.method ?? (this.isCfop() ? this.method : 'cfop');
+    if (as.cross !== undefined) this.cross = as.cross;
     this.run(async () => {
       const r = await api<Snap & Err>('reset'); if (this.fail(r)) return;
       this.snap = r;
@@ -652,7 +662,7 @@ class Sim {
     for (const k of ['dim', 'card', 'idle', 'rgb', 'modern'] as const) if (store.get(k) === '0') this.opts[k] = false;
     for (const k of ['grey', 'cam', 'fixed'] as const) this.opts[k] = store.get(k) === '1';
     const method = QS.get('method');
-    if (method === 'kociemba' || method === 'cfop2') this.method = method;
+    if (method && method in LOOKS) this.method = method as Method;
     if (QS.get('orbit')) { const [x, y] = QS.get('orbit')!.split(',').map(Number); this.orbit = { x, y }; }
     this.status('Loading engine');
     const s = await api<Snap & Err>('state');

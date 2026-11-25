@@ -13,13 +13,13 @@ beforeEach(() => api('reset'));
 
 describe('cfop', () => {
   // Rotated holds too, since a colour is a sticker and not a face of the current frame
-  for (const look of [1, 2]) for (const hold of ['', 'x2 y', "z'"])
-    it(`solves on every cross colour, ${look}-look, held ${hold || 'as scrambled'}`, async () => {
+  for (const [oll, pll] of [[1, 1], [2, 2], [2, 1], [1, 2]]) for (const hold of ['', 'x2 y', "z'"])
+    it(`solves on every cross colour, ${oll}-look OLL ${pll}-look PLL, held ${hold || 'as scrambled'}`, async () => {
       for (const scramble of SCRAMBLES) for (let color = 0; color < 6; color++) {
         await api('reset');
         await apply(scramble + ' ' + hold);
         const { lengths } = await api<{ lengths: number[] }>('crosses');
-        const plan = await api<Plan>('cfop', { color, look });
+        const plan = await api<Plan>('cfop', { color, oll, pll });
         expect(plan.steps[0].label).toBe(COLOR_NAMES[color] + ' cross');
         expect(plan.steps[0].moves).toHaveLength(lengths[color]);
 
@@ -48,10 +48,12 @@ describe('cfop', () => {
 
   it('names its last layer steps by look', async () => {
     await apply(SCRAMBLES[0]);
-    const labels = async (look: number) =>
-      (await api<Plan>('cfop', { look })).steps.map(s => s.label).filter(l => !/cross|pair/.test(l));
-    expect(await labels(1)).toEqual(['OLL', 'PLL']);
-    expect(await labels(2)).toEqual(['OLL edges', 'OLL corners', 'PLL corners', 'PLL edges']);
+    const labels = async (oll: number, pll: number) =>
+      (await api<Plan>('cfop', { oll, pll })).steps.map(s => s.label).filter(l => !/cross|pair/.test(l));
+    expect(await labels(1, 1)).toEqual(['OLL', 'PLL']);
+    expect(await labels(2, 2)).toEqual(['OLL edges', 'OLL corners', 'PLL corners', 'PLL edges']);
+    expect(await labels(2, 1)).toEqual(['OLL edges', 'OLL corners', 'PLL']);
+    expect(await labels(1, 2)).toEqual(['OLL', 'PLL corners', 'PLL edges']);
   });
 
   it('rejects a colour that does not exist', async () => {
@@ -83,9 +85,10 @@ it('kociemba solves', async () => {
   expect((await apply(moves.join(' '))).solved).toBe(true);
 });
 
-it('analyze reports all six crosses without touching the session', async () => {
+it('analyze reports all six crosses and the cube, without touching the session', async () => {
   const before = await apply('R U F');
   const a = await api<{ crosses: { color: string; moves: string[] }[] }>('analyze', { scramble: SCRAMBLES[0] });
+  expect(Object.keys(a).sort()).toEqual(['crosses', 'state']);
   expect(a.crosses.map(c => c.color)).toEqual(COLOR_NAMES);
   expect(await api('state')).toEqual(before);
 });
