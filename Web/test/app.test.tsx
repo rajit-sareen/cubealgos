@@ -82,6 +82,40 @@ it('drives the solve with Space after the moves dropdown is clicked', async () =
   await vi.waitFor(() => expect(text('#left .val')).toBe('Solved'));
 });
 
+// The camera is held still from the front, and a drag only looks round the cube for
+// as long as it lasts
+it('keeps the view in front when fixed', async () => {
+  await go('#/sim', '#viewport');
+  const vp = $('#viewport')!, home = { x: -28, y: -38 };
+  const drag = (to: number) => {
+    vp.dispatchEvent(new MouseEvent('mousedown', { clientX: 100, clientY: 100, bubbles: true }));
+    window.dispatchEvent(new MouseEvent('mousemove', { clientX: to, clientY: 120 }));
+    window.dispatchEvent(new MouseEvent('mouseup', {}));
+  };
+  const drift = async () => {
+    sim.cam.lastInput = -1e9;
+    const y = sim.orbit.y;
+    await new Promise(r => setTimeout(r, 150));
+    return Math.abs(sim.orbit.y - y);
+  };
+  expect(sim.opts.cam).toBe(false);
+  expect(await drift()).toBeGreaterThan(0.2);
+
+  button('Fixed view').click();
+  await vi.waitFor(() => expect(sim.cam.target).toBeNull());
+  expect(sim.orbit).toEqual(home);
+  expect(button('Auto camera').disabled).toBe(true);
+  expect(button('Idle drift').disabled).toBe(true);
+  expect(await drift()).toBe(0);
+
+  drag(260);
+  expect(Math.abs(sim.orbit.y - home.y)).toBeGreaterThan(20);
+  await vi.waitFor(() => expect(sim.cam.target).toBeNull());
+  expect(sim.orbit).toEqual(home);
+  expect(localStorage.getItem('fixed')).toBe('1');
+  button('Fixed view').click();
+});
+
 it('opens every page', async () => {
   await go('#/stats', '#main.stats');
   await go('#/profile', '[aria-current=page][href="#/profile"]');

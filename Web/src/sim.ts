@@ -14,8 +14,9 @@ export type Look = 'all' | 'edges' | 'corners';  // Last Layer Pieces a Step Sol
 interface Opts {
   turn: number; gap: number;
   dim: boolean; grey: boolean; card: boolean; cam: boolean; idle: boolean; rgb: boolean; modern: boolean;
+  fixed: boolean;  // Seen From the Front Always, as a Cube Held in the Hands
 }
-export type OptKey = 'dim' | 'grey' | 'card' | 'cam' | 'idle' | 'rgb' | 'modern';
+export type OptKey = 'dim' | 'grey' | 'card' | 'cam' | 'idle' | 'rgb' | 'modern' | 'fixed';
 interface Err { error?: string }
 
 export const STAGE_NAMES: Record<Stage, string> = { cross: 'Cross', f2l: 'F2L', oll: 'OLL', pll: 'PLL', done: 'Solved' };
@@ -46,7 +47,7 @@ class Sim {
   opId = 'CUBE_0X' + Math.floor(Math.random() * 4096).toString(16).toUpperCase().padStart(3, '0');
   method: Method = 'cfop';
   tempo = 50;
-  opts: Opts = { turn: 220, gap: 160, dim: true, grey: false, card: true, cam: true, idle: true, rgb: true, modern: true };
+  opts: Opts = { turn: 220, gap: 160, dim: true, grey: false, card: true, cam: false, idle: true, rgb: true, modern: true, fixed: false };
   plan: Plan | null = null;
   // The cube a plan was made for, kept once the plan has been played through, so another
   // cross can be tried from the same start. Any move made by hand forgets it
@@ -102,13 +103,13 @@ class Sim {
         const dx = cam.target.x - orbit.x, dy = wrap(cam.target.y - orbit.y);
         const k = 1 - Math.exp(-dt / this.camTau());
         orbit.x += dx * k; orbit.y += dy * k;
-        if (Math.abs(dx) < .5 && Math.abs(dy) < .5) cam.target = null;
+        if (Math.abs(dx) < .5 && Math.abs(dy) < .5) { orbit.x = cam.target.x; orbit.y = cam.target.y; cam.target = null; }
       } else {
         orbit.y += cam.vy; orbit.x = clampX(orbit.x + cam.vx);
         cam.vx *= .94; cam.vy *= .94;
         if (Math.abs(cam.vx) < .03) cam.vx = 0;
         if (Math.abs(cam.vy) < .03) cam.vy = 0;
-        const idle = this.opts.idle && !this.playing && !this.busy && now - cam.lastInput > 2500;
+        const idle = this.opts.idle && !this.opts.fixed && !this.playing && !this.busy && now - cam.lastInput > 2500;
         if (idle) {
           orbit.y += .05;
           orbit.x += (Math.sin(now / 3100) * 8 - 24 - orbit.x) * .004;
@@ -182,6 +183,8 @@ class Sim {
       if (!cam.drag) return;
       if (performance.now() - cam.drag.t > 80) cam.vx = cam.vy = 0;
       cam.drag = null; cam.lastInput = performance.now();
+      // A Fixed View Lets the Cube Be Looked Round, Then Goes Back to the Front
+      if (this.opts.fixed) this.viewReset();
     };
     // Presses on the viewport's own buttons are clicks, not drags
     const onButton = (e: Event) => !!(e.target as Element).closest('button');
@@ -422,7 +425,7 @@ class Sim {
   }
   step = async () => {
     const t = this.nextToken(); if (!t) return false;
-    if (this.opts.cam && !this.cam.drag) {
+    if (this.opts.cam && !this.opts.fixed && !this.cam.drag) {
       const face = 'xyzMES'.includes(t[0]) ? null : t[0].toUpperCase();
       const want = face && (PEEK_OF_FACE[face] || HOME_ORBIT);
       if (face && want && !this.visible(face) && !this.nearOrbit(want)) {
@@ -606,7 +609,11 @@ class Sim {
     this.render();
     this.refreshCrosses();
   }
-  setOpt(key: OptKey, on: boolean) { this.opts[key] = on; store.set(key, on ? '1' : '0'); this.notify(); }
+  setOpt(key: OptKey, on: boolean) {
+    this.opts[key] = on; store.set(key, on ? '1' : '0');
+    if (key === 'fixed' && on) this.viewReset();
+    this.notify();
+  }
   setTempo(v: number) {
     v = Math.max(0, Math.min(100, Math.round(v)));
     const t = tempoOf(v); this.opts.turn = t.turn; this.opts.gap = t.gap; this.tempo = v;
@@ -642,8 +649,8 @@ class Sim {
     this.booted = true;
     const tempo = store.get('tempo');
     this.setTempo(tempo != null && tempo !== '' && !isNaN(+tempo) && +tempo <= 100 ? +tempo : 50);
-    for (const k of ['dim', 'card', 'cam', 'idle', 'rgb', 'modern'] as const) if (store.get(k) === '0') this.opts[k] = false;
-    this.opts.grey = store.get('grey') === '1';
+    for (const k of ['dim', 'card', 'idle', 'rgb', 'modern'] as const) if (store.get(k) === '0') this.opts[k] = false;
+    for (const k of ['grey', 'cam', 'fixed'] as const) this.opts[k] = store.get(k) === '1';
     const method = QS.get('method');
     if (method === 'kociemba' || method === 'cfop2') this.method = method;
     if (QS.get('orbit')) { const [x, y] = QS.get('orbit')!.split(',').map(Number); this.orbit = { x, y }; }

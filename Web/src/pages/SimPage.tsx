@@ -137,8 +137,9 @@ function RightPanel() {
             <Toggle k="dim">Highlight step</Toggle>
             <Toggle k="grey">Grey, not fade</Toggle>
             <Toggle k="card">Case card</Toggle>
-            <Toggle k="cam">Auto camera</Toggle>
-            <Toggle k="idle">Idle drift</Toggle>
+            <Toggle k="fixed">Fixed view</Toggle>
+            <Toggle k="cam" off={s.opts.fixed}>Auto camera</Toggle>
+            <Toggle k="idle" off={s.opts.fixed}>Idle drift</Toggle>
             <Toggle k="rgb">Colours</Toggle>
             <Toggle k="modern">Modern look</Toggle>
           </div>
@@ -157,9 +158,11 @@ function RightPanel() {
   );
 }
 
-function Toggle({ k, children }: { k: OptKey; children: string }) {
+// off greys out an option another one overrides, keeping its setting for when it is back
+function Toggle({ k, off = false, children }: { k: OptKey; off?: boolean; children: string }) {
   const s = useSim();
-  return <button className={'tg' + (s.opts[k] ? ' on' : '')} aria-pressed={s.opts[k]} onClick={() => sim.setOpt(k, !s.opts[k])}>{children}</button>;
+  return <button className={'tg' + (s.opts[k] && !off ? ' on' : '')} aria-pressed={s.opts[k] && !off} disabled={off}
+                 onClick={() => sim.setOpt(k, !s.opts[k])}>{children}</button>;
 }
 
 // The sequence is bare notation: group labels and tokens, the next one inverted

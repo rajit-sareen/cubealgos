@@ -107,6 +107,31 @@ describe('pickCross', () => {
   });
 });
 
+describe('camera', () => {
+  // A move on a face out of sight turns the camera to it only with auto camera on and the
+  // view not fixed
+  it('follows hidden faces only when asked to', async () => {
+    const peeks = async (cam: boolean, fixed: boolean) => {
+      Object.assign(sim.opts, { cam, fixed });
+      sim.orbit = { x: -28, y: -38 };
+      sim.cam.target = null;
+      await sim.run(sim.reset);
+      await sim.run(() => sim.applyTokens(['B', 'R', 'U', 'F']));
+      await sim.run(sim.planSolution);
+      while (sim.plan && sim.nextToken()![0] !== 'B' && sim.nextToken()![0] !== 'L') await sim.run(sim.step);
+      sim.run(sim.step);
+      await Promise.resolve();
+      const moved = sim.cam.target != null;
+      await settle();
+      return moved;
+    };
+    expect(await peeks(true, false)).toBe(true);
+    expect(await peeks(false, false)).toBe(false);
+    expect(await peeks(true, true)).toBe(false);
+    sim.opts.fixed = false;
+  });
+});
+
 describe('setMethod', () => {
   it('takes on the same scramble with the new method', async () => {
     await load();
