@@ -17,12 +17,19 @@ void buildTables() {
     TwoLook::buildTables();
 }
 
+static std::string joinTurns(const std::vector<std::string>& turns) {
+    std::string s;
+    for (const std::string& t : turns) s += (s.empty() ? "" : " ") + t;
+    return s;
+}
+
 // Every stage works in the cross frame, the cheapest colour on the bottom
 // Moves are translated back so Main executes them in the scrambling frame like every
 // other method, and the notation opens with the rotation instead
 static std::vector<Stage> run(const CubeState& s, bool twoLook) {
     CrossResult cross = Cross::bestCross(s);
     CubeState state = s.rotate(cross.hold);
+    Orientation hold = cross.hold;
     std::vector<Stage> result;
 
     // Execute One Step, as Part of the Last Stage Opened
@@ -30,7 +37,7 @@ static std::vector<Stage> run(const CubeState& s, bool twoLook) {
         Stage& stage = result.back();
         for (Move m : moves) {
             state = state.apply(m);
-            stage.moves.push_back(translateMove(m, cross.hold));
+            stage.moves.push_back(translateMove(m, hold));
         }
         if (!stage.notation.empty() && !notation.empty()) stage.notation += " ";
         stage.notation += notation;
@@ -38,15 +45,22 @@ static std::vector<Stage> run(const CubeState& s, bool twoLook) {
     auto look = [&](const char* name, Case (*find)(const CubeState&)) {
         result.push_back({name, {}, ""});
         Case c = find(state);
-        std::string notation;
-        for (const std::string& t : c.notation) notation += (notation.empty() ? "" : " ") + t;
-        append(c.moves, notation);
+        append(c.moves, joinTurns(c.notation));
     };
 
     result.push_back({"Cross", {}, rotationsTo(cross.hold)});
     append(cross.moves, sequenceName(cross.moves));
     result.push_back({"F2L", {}, ""});
-    for (const F2LPair& p : F2L::solve(state)) append(p.moves, sequenceName(p.moves));
+    Orientation turned;
+    for (const F2LPair& p : F2L::solve(state, cross.moves)) {
+        append(p.moves, joinTurns(p.notation));
+        turned = p.hold;
+    }
+    result.back().moves = canonicalize(result.back().moves);
+
+    // The Last Layer Goes On From the Hold F2L Ended In
+    state = state.rotate(turned);
+    hold = hold.then(turned);
     if (twoLook) look("EOLL", TwoLook::orientEdges);
     look(twoLook ? "OCLL" : "OLL", OLL::find);
     if (twoLook) look("CPLL", TwoLook::permuteCorners);

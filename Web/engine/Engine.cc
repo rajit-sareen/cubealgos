@@ -165,9 +165,18 @@ std::string cfop(const CubeState& start, const Orientation& hold, int color = -1
 
     std::string out = "{\"rotation\":" + quoted(rotationsTo(cross.hold)) + ",\"steps\":[";
     out += step(std::string(colorName(hold.faceAt(cross.color))) + " cross", run(cross.moves));
-    static const char* slotName[] = {"DFR", "DLF", "DBL", "DRB"};
-    for (const F2LPair& p : F2L::solve(s))
-        out += "," + step(std::string(slotName[p.slot]) + " pair", run(p.moves));
+    // A pair is named by its edge's colours, since its slot changes name as F2L rotates
+    // the cube about
+    Orientation frame = hold.then(cross.hold), turned;
+    for (const F2LPair& p : F2L::solve(s, cross.moves)) {
+        const int* faces = EDGE_FACES[F2L::edge(p.slot)];
+        std::string name = std::string(colorName(frame.faceAt(faces[0]))) + " "
+                         + colorName(frame.faceAt(faces[1])) + " pair";
+        run(p.moves);
+        out += "," + step(name, p.notation);
+        turned = p.hold;
+    }
+    s = s.rotate(turned);
     auto look = [&](const char* label, const Case& c) {
         run(c.moves);
         out += "," + step(label, c.notation, c.name);

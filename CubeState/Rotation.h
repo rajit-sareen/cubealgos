@@ -52,6 +52,13 @@ Turn parseTurn(const std::string& s);
 // after, when given, gets the hold the sequence ends in
 std::vector<Move> parseWritten(const std::string& s, Orientation* after = nullptr);
 
+// A face or wide turn made while holding the cube as o, as written in the identity frame
+// Every turn of an alg carried over this way gives the alg as seen from the other hold
+std::string translateTurn(const std::string& turn, const Orientation& o);
+
+// Add a turn to a written sequence, merged with the last one when both are the same layer
+void appendTurn(std::vector<std::string>& written, const std::string& turn);
+
 // Names
 const char* rotationName(CubeRot r);                     // "x2"
 const char* colorName(int color);                        // 0=white ... 5=blue

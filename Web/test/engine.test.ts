@@ -26,11 +26,11 @@ describe('cfop', () => {
         let s = await apply(plan.rotation + ' ' + plan.steps[0].moves.join(' '));
         expect(s.cross).toBe(true);
         expect(s.faces[3]).toBe(color);
-        const held = s.hold;
+        // F2L may turn the cube about with y, never off its cross
         for (const step of plan.steps.slice(1)) {
           for (const t of step.moves) expect(t).toMatch(MOVE_RE);
           s = await apply(step.moves.join(' '));
-          expect(s.hold).toBe(held);
+          expect(s.faces[3]).toBe(color);
         }
         expect(s.solved).toBe(true);
       }

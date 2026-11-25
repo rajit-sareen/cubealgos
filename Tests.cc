@@ -1466,13 +1466,14 @@ static bool runAllTests() {
     }
 
     // Test 98: the F2L table holds all 149 cases plus solved, and every alg, set up in
-    // every slot by undoing it from a y turned hold, comes back no longer than itself
-    // and leaves the cross and all four pairs home
+    // every slot by undoing it from a y turned hold, comes back in at most two turns more
+    // than itself and leaves the cross and all four pairs home. A case with a second alg
+    // may come back by that one, if it turns easier
     {
         bool ok = F2L::tableSize() == 150;
         CubeState solved = CubeState::solved();
         for (const F2LAlgo& a : F2L_ALGS) {
-            std::vector<Move> alg = parseSequence(a.moves);
+            std::vector<Move> alg = parseWritten(a.moves);
             Orientation hold;
             for (int turn = 0; turn < 4; turn++, hold = hold.then(CubeRot::y)) {
                 CubeState s = solved;
@@ -1486,7 +1487,7 @@ static bool runAllTests() {
                 if (opened != 1) { ok = false; continue; }
 
                 std::vector<Move> fix = F2L::solvePair(s, open, 0);
-                if (fix.size() > alg.size()) ok = false;
+                if (fix.size() > alg.size() + 2) ok = false;
                 for (Move m : fix) s = s.apply(m);
                 if (!F2L::isSolved(s)) ok = false;
             }
@@ -1518,7 +1519,7 @@ static bool runAllTests() {
     // is one alg from the table, no longer than the longest alg plus an AUF
     {
         size_t longest = 0;
-        for (const F2LAlgo& a : F2L_ALGS) longest = std::max(longest, parseSequence(a.moves).size());
+        for (const F2LAlgo& a : F2L_ALGS) longest = std::max(longest, parseWritten(a.moves).size());
         bool ok = true;
         int extracted = 0;
         for (uint64_t seed = 100; seed < 160 && ok; seed++) {
@@ -1730,6 +1731,44 @@ static bool runAllTests() {
             try { parseTurn(bad); ok = false; } catch (const std::exception&) {}
         }
         total++; if (runTest("Wide and slice turns match their layers", ok)) passed++;
+    }
+
+    // ─── CFOP: F2L as Written ────────────────────────────────────────────────────
+
+    // Test 108: F2L's notation, read straight through from the cross frame with its y
+    // rotations, solves the two layers, ends in the hold the last pair reports, and never
+    // turns B or turns one face twice running
+    //
+    // The two bounds pin the planner against the greedy one it replaced, which took 28.9
+    // turns on average and B 3.9 times a solve
+    {
+        bool ok = true;
+        int turns = 0;
+        const int SOLVES = 60;
+        for (uint64_t seed = 300; seed < 300 + SOLVES; seed++) {
+            CubeState s = CubeState::solved();
+            for (Move m : WCA::scramble(seed)) s = s.apply(m);
+            CrossResult cross = Cross::bestCross(s);
+            CubeState st = s.rotate(cross.hold);
+            for (Move m : cross.moves) st = st.apply(m);
+            std::vector<F2LPair> pairs = F2L::solve(st, cross.moves);
+
+            std::string written;
+            std::vector<std::string> all;
+            for (const F2LPair& p : pairs)
+                for (const std::string& t : p.notation) { written += t + " "; all.push_back(t); }
+            Orientation end;
+            for (Move m : parseWritten(written, &end)) st = st.apply(m);
+            if (!F2L::isSolved(st) || end != pairs.back().hold) ok = false;
+            for (size_t i = 0; i < all.size(); i++) {
+                if (all[i][0] == 'y') continue;
+                turns++;
+                if (all[i][0] == 'B' || all[i][0] == 'b') ok = false;
+                if (i > 0 && all[i][0] == all[i - 1][0]) ok = false;
+            }
+        }
+        if (turns > 26 * SOLVES) ok = false;
+        total++; if (runTest("F2L as written solves, without B or a face turned twice", ok)) passed++;
     }
 
     std::cout << "\n" << BOLD;

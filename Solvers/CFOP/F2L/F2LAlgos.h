@@ -3,8 +3,10 @@
 
 #include <string>
 
-// One Alg per Case, Pair Inserted Into the FR Slot
+// Pair Inserted Into the FR Slot, One Alg or More per Case
 // Corner and edge start in the U layer or the FR slot, never in another slot
+// Each alg ends in the hold it started in. With more than one the solver takes whichever
+// turns easiest from the hold it is in
 struct F2LAlgo {
     std::string name;
     std::string moves;
@@ -50,8 +52,13 @@ const F2LAlgo F2L_ALGS[] = {
     {"corner URF D right, edge in slot flipped",     "U F' U' F U' R U R'"},
     {"corner URF D front, edge in slot flipped",     "U' R U R' U F' U' F"},
     {"corner in slot solved, edge in slot flipped",  "R2 U2 F R2 F' U2 R' U R'"},
-    {"corner in slot D front, edge in slot flipped", "F' U F R B U2 B' R'"},
-    {"corner in slot D right, edge in slot flipped", "R U' R' F' L' U2 L F"},
+    {"corner in slot D front, edge in slot flipped", "r U' r' U2 r U r' R U R'"},
+    {"corner in slot D right, edge in slot flipped", "R U' R' r U' r' U2 r U r'"},
+
+    // Second Algs
+    {"corner in slot solved, edge UB",               "U' F' U F U R U' R'"},
+    {"corner in slot solved, edge UB flipped",       "U R U' R' U' F' U F"},
+    {"corner URF D up, edge in slot",                "R U R' U' R U R' U' R U R'"},
 };
 
 #endif // F2L_ALGOS_H

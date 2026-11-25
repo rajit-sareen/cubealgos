@@ -1,7 +1,7 @@
 import { useSyncExternalStore } from 'react';
 import { api } from './engine';
 import {
-  AXIS_OF_FACE, CORNER_FACES, CORNER_NAMES, CUBIES, EDGE_FACES, GAP,
+  AXIS_OF_FACE, COLOR_NAMES, CORNER_FACES, CUBIES, EDGE_FACES, GAP,
   HOME_ORBIT, MOVE_RE, PEEK_OF_FACE, ROT_FACE, SCRAMBLE_TEMPO, SLICE_FACE, clampX, ease,
   faceVisible, tempoOf, wrap, type Kind, type Snap,
 } from './cube';
@@ -266,8 +266,9 @@ class Sim {
   }
 
   // Only while a solution is being followed, and only the pieces its current step moves
-  // A pair counts as done if it was home when the step began: algs lift finished pairs
-  // out and put them back, and the live flags would grey them out on the way
+  // A pair counts as done if it was home when the step began or an earlier step put it
+  // in: algs lift finished pairs out and put them back, and a turn merged into the next
+  // pair can leave one a turn short, so the live flags would grey them out on the way
   stagePieces() {
     const set = new Set<string>();
     if (!this.isCfop() || !this.following() || !this.plan) return set;
@@ -275,13 +276,24 @@ class Sim {
     const add = (kind: Kind, piece: number) => set.add(kind + piece);
     if (cur === 'cross') [4,5,6,7].forEach(p => add('e', p));
     if (cur === 'f2l') {
-      [4,5,6,7].forEach(p => add('e', p));
       const { g } = this.groupAt(this.plan.pos);
-      const m = g.label.match(/\b(DFR|DLF|DBL|DRB)\b/);
-      const done = (g.startSnap || this.snap!).pairs;
-      const slots = m ? [CORNER_NAMES.indexOf(m[1]) - 4] : [0,1,2,3].filter(k => !done[k]);
-      for (const k of slots) { add('c', 4 + k); add('e', 8 + k); }
-      for (const k of [0,1,2,3]) if (done[k]) { add('c', 4 + k); add('e', 8 + k); }
+      const from = g.startSnap;
+      [4,5,6,7].forEach(p => add('e', this.pieceNow('e', p, from)));
+      const down = COLOR_NAMES.indexOf(this.plan.groups[0].label.split(' ')[0]);
+      const pair = (label: string) => {
+        const [a, b] = label.split(' ').map(c => COLOR_NAMES.indexOf(c));
+        add('e', this.pieceWith('e', [a, b]));
+        add('c', this.pieceWith('c', [a, b, down]));
+      };
+      const named = (l: string) => /^\w+ \w+ pair$/.test(l);
+      if (named(g.label)) pair(g.label);
+      else if (from) [0,1,2,3].filter(k => !from.pairs[k]).forEach(k => {
+        add('c', this.pieceNow('c', 4 + k, from)); add('e', this.pieceNow('e', 8 + k, from));
+      });
+      for (const h of this.plan.groups.slice(0, this.plan.groups.indexOf(g))) if (named(h.label)) pair(h.label);
+      if (from) [0,1,2,3].filter(k => from.pairs[k]).forEach(k => {
+        add('c', this.pieceNow('c', 4 + k, from)); add('e', this.pieceNow('e', 8 + k, from));
+      });
     }
     if (cur === 'oll' || cur === 'pll') {
       const { g } = this.groupAt(this.plan.pos);
@@ -302,6 +314,13 @@ class Sim {
     const colors = (s: Snap, p: number) => FACES[p].map(f => s.faces[f]).sort().join();
     const want = colors(from, piece);
     return FACES.findIndex((_, p) => colors(this.snap!, p) === want);
+  }
+
+  // The piece, numbered in the current frame, that carries these colours
+  private pieceWith(kind: 'c' | 'e', colors: number[]) {
+    const FACES = kind === 'c' ? CORNER_FACES : EDGE_FACES;
+    const want = [...colors].sort().join();
+    return FACES.findIndex(f => f.map(x => this.snap!.faces[x]).sort().join() === want);
   }
 
   groupStart(g: Group) {

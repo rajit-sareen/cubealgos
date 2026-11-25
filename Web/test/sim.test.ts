@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from 'vitest';
-import { CUBIES, GAP, cubieColors, type Snap } from '../src/cube';
+import { COLOR_NAMES, CUBIES, EDGE_FACES, GAP, cubieColors, type Snap } from '../src/cube';
 import { sim } from '../src/sim';
 
 const SCRAMBLE = "B2 U' F2 R2 U' B2 R2 D' R2 D B D' B L U2 F' D' L2 U' L".split(' ');
@@ -186,6 +186,36 @@ describe('setMethod', () => {
     await settle();
     expect(sim.crosses).toEqual([6, 5, 4, 7, 5, 6]);
   });
+});
+
+// Through F2L the cross and the pairs placed or being placed are bright and nothing
+// else, whichever way F2L has turned the cube, matched by colour as a solver sees them
+it('highlights the pair being placed and those before it', async () => {
+  const key = (colors: number[]) => [...colors].sort().join();
+  let checked = 0;
+  for (let color = 0; color < 6; color++) {
+    sim.cross = color;
+    await load();
+    const pairs = new Set<string>();   // Edge Colours of Each Pair Bright
+    while (sim.plan) {
+      const { g } = sim.groupAt(sim.plan.pos);
+      const s: Snap = sim.snap!;
+      if (g.label.endsWith(' pair') && g.startSnap) {
+        const down = g.startSnap.faces[3];
+        if (!pairs.size)
+          g.startSnap.pairs.forEach((home, k) => { if (home) pairs.add(key(EDGE_FACES[8 + k].map(f => g.startSnap!.faces[f]))); });
+        pairs.add(key(g.label.split(' ').slice(0, 2).map(c => COLOR_NAMES.indexOf(c))));
+        const set = sim.stagePieces();
+        s.ep.forEach((p, i) => expect(set.has('e' + p)).toBe(s.edges[i].includes(down) || pairs.has(key(s.edges[i]))));
+        s.cp.forEach((p, i) => expect(set.has('c' + p)).toBe(s.corners[i].includes(down)
+          && pairs.has(key(s.corners[i].filter(c => c !== down)))));
+        checked++;
+      }
+      await sim.run(sim.step);
+    }
+    expect(sim.snap!.solved).toBe(true);
+  }
+  expect(checked).toBeGreaterThan(100);
 });
 
 // The pieces kept bright are the last layer's all through an alg, though an M or r turn

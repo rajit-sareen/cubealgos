@@ -284,6 +284,27 @@ std::vector<Move> parseWritten(const std::string& s, Orientation* after) {
     return moves;
 }
 
+std::string translateTurn(const std::string& turn, const Orientation& o) {
+    bool wide = turn[0] >= 'a' && turn[0] <= 'z';
+    std::string face = turn;
+    if (wide) face[0] = turn[0] - 'a' + 'A';
+    std::string result = moveName(translateMove(parseMove(face), o));
+    if (wide) result[0] = result[0] - 'A' + 'a';
+    return result;
+}
+
+void appendTurn(std::vector<std::string>& written, const std::string& turn) {
+    static const char* SUFFIX[] = {"", "", "2", "'"};
+    auto quarters = [](const std::string& t) { return t.size() == 1 ? 1 : t[1] == '2' ? 2 : 3; };
+    if (written.empty() || written.back()[0] != turn[0]) {
+        written.push_back(turn);
+        return;
+    }
+    int turns = (quarters(written.back()) + quarters(turn)) % 4;
+    if (turns == 0) written.pop_back();
+    else written.back() = turn.substr(0, 1) + SUFFIX[turns];
+}
+
 // Names
 
 const char* rotationName(CubeRot r) {
