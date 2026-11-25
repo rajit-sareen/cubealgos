@@ -1,4 +1,5 @@
-import { defineConfig, type Plugin } from 'vite';
+import type { Plugin } from 'vite';
+import { defineConfig } from 'vitest/config';
 import react from '@vitejs/plugin-react';
 
 // The worker holds the engine it started with, and hot updates never reach it, so an open
@@ -23,4 +24,5 @@ export default defineConfig({
   base: process.env.BASE_PATH ?? '/',
   plugins: [react(), reloadEngine],
   worker: { format: 'es' },
+  test: { environment: 'jsdom', setupFiles: 'test/setup.ts', testTimeout: 30000 },
 });

@@ -15,6 +15,7 @@ Needs a C++17 compiler and `make`.
 ```sh
 make              # builds ./cubealgo and ./tests
 make test         # runs the test suite
+make web-test     # runs the site's tests (see Web/README.md)
 ./cubealgo        # ENTER for a scramble and solution, m changes method, q quits
 ```
 

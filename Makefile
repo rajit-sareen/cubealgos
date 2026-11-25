@@ -46,7 +46,7 @@ EMFLAGS = -std=c++17 -O3 -I. -fwasm-exceptions -sMODULARIZE -sEXPORT_ES6 \
 WASM = Web/src/engine/engine.mjs
 HEADERS = $(wildcard CubeState/*.h Scramblers/*.h Solvers/*.h Solvers/*/*.h Solvers/*/*/*.h)
 
-.PHONY: wasm web
+.PHONY: wasm web web-test
 wasm: $(WASM)
 
 $(WASM): Web/engine/Engine.cc $(CORE) $(SOLVERS) $(SCRAMBLERS) $(HEADERS)
@@ -55,6 +55,10 @@ $(WASM): Web/engine/Engine.cc $(CORE) $(SOLVERS) $(SCRAMBLERS) $(HEADERS)
 
 web: $(WASM)
 	cd Web && npm ci && npm run build
+
+# The front end's tests, run against the compiled engine. Needs npm install in Web/ first
+web-test: $(WASM)
+	cd Web && npm test
 
 $(BUILD)/%.o: %.cc | $(BUILD)
 	$(CXX) $(CXXFLAGS) -c $< -o $@

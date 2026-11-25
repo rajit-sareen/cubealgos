@@ -24,13 +24,14 @@ jobs:
       - uses: mymindstorm/setup-emsdk@v14
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: 24
           cache: npm
           cache-dependency-path: Web/package-lock.json
       - run: make test
       - run: make web
         env:
           BASE_PATH: /${{ github.event.repository.name }}/
+      - run: make web-test
       - uses: actions/upload-pages-artifact@v3
         with:
           path: Web/dist

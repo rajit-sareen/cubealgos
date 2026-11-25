@@ -10,4 +10,5 @@ From the repo root:
 make wasm                 # compiles the engine to Web/src/engine/
 cd Web && npm install
 npm run dev               # dev server at http://localhost:5173
+npm test                  # front end tests, against the compiled engine
 ```

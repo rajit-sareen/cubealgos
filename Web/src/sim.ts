@@ -458,9 +458,14 @@ class Sim {
   };
 
   // Whole solve with the chosen method; CFOP folds the rotation into its first step
+  private planning = 0;  // Searches and Rewinds Under Way
   planSolution = async () => {
     if (this.busy || this.playing) return false;
     if (this.snap!.solved) return false;
+    this.planning++;
+    try { return await this.search(); } finally { this.planning--; }
+  };
+  private async search() {
     if (this.opts.cam && !this.visible('F')) this.cam.target = { ...HOME_ORBIT };
     if (this.method === 'kociemba') return (await this.kociemba()) != null;
     this.status('Searching');
@@ -469,7 +474,7 @@ class Sim {
     const rot = r.rotation ? r.rotation.split(' ') : [];
     this.setPlan(r.steps.map((s, i) => ({ label: s.label, tokens: i === 0 ? [...rot, ...s.moves] : s.moves, caseName: s.case })));
     return true;
-  };
+  }
   playSolution = async () => {
     if (this.busy || this.playing) return;
     if (!await this.planSolution()) return;
@@ -492,18 +497,27 @@ class Sim {
     this.notify();
   }
 
-  // Goes back to the cube the current plan started from and plans it again
-  pickCross(color: number | null) {
-    this.cross = color; this.playing = false; this.notify();
+  // Goes back to the cube the current plan started from, if there is one, and plans it
+  // again
+  //
+  // The lengths are asked for at the start since the plan to come holds them still, and a
+  // Kociemba plan never asked
+  private replan() {
+    this.playing = false; this.notify();
     if (!this.snap) return;
     this.run(async () => {
-      const start = this.base;
-      this.plan = this.base = null;
-      while (start && this.snap!.history > start.history) this.snap = await api<Snap>('undo');
-      this.render();
-      await this.planSolution();
+      this.planning++;
+      try {
+        const start = this.base;
+        this.plan = this.base = null;
+        while (start && this.snap!.history > start.history) this.snap = await api<Snap>('undo');
+        this.render();
+        this.refreshCrosses();
+        await this.planSolution();
+      } finally { this.planning--; }
     });
   }
+  pickCross(color: number | null) { this.cross = color; this.replan(); }
 
   // A timer solve's scramble, put on the cube at once and planned, ready to play
   loadScramble(moves: string[]) {
@@ -564,7 +578,15 @@ class Sim {
   }
 
   isCfop() { return this.method !== 'kociemba'; }
-  setMethod(m: Method) { this.method = m; this.plan = this.base = null; this.render(); this.refreshCrosses(); }
+  // With a plan made, or on its way, the new method takes on the same cube from its start,
+  // so two methods can be compared on one scramble. Otherwise there is nothing to redo
+  setMethod(m: Method) {
+    if (m === this.method) return;
+    this.method = m;
+    if (this.base || this.planning) return this.replan();
+    this.render();
+    this.refreshCrosses();
+  }
   setOpt(key: OptKey, on: boolean) { this.opts[key] = on; store.set(key, on ? '1' : '0'); this.notify(); }
   setTempo(v: number) {
     v = Math.max(0, Math.min(100, Math.round(v)));
