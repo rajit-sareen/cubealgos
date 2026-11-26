@@ -1,4 +1,5 @@
-import { useEffect, useLayoutEffect, useRef, type CSSProperties } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from 'react';
+import { copyText, openScramble, readScramble, scrambleLink } from '../share';
 import { COLOR_NAMES, COLOR_VARS, PATTERN_VARS, pad3, tempoOf } from '../cube';
 import { METHOD_LABELS, STAGE_NAMES, sim, useSim, type Method, type OptKey } from '../sim';
 import { Viewport } from '../components/Viewport';
@@ -16,17 +17,45 @@ export function SimPage() {
   </>;
 }
 
+// The scramble on the cube, with a box to solve one of your own and a link to share it
 function ScrambleBar() {
   const s = useSim();
   const playing = s.scramblePos < s.scrambleMoves.length;
+  const [typing, setTyping] = useState(false);
+  const [text, setText] = useState('');
+  const [note, setNote] = useState('');
+  const flash = (msg: string) => { setNote(msg); setTimeout(() => setNote(''), 1500); };
+  const enter = () => {
+    const moves = readScramble(text);
+    if (!moves) return flash('Not a scramble');
+    openScramble(moves, { method: sim.isCfop() ? sim.method : undefined, cross: sim.cross });
+    setTyping(false); setText('');
+  };
+  const share = async () => {
+    if (await copyText(scrambleLink(s.scrambleMoves, { method: s.method, cross: s.cross }))) flash('Link copied');
+  };
   return (
     <div id="scrambleBar">
       <span className="lbl">Scramble</span>
-      <span id="scrambleTokens">
-        {!s.scrambleMoves.length ? '---' : <>
-          {s.scrambleMoves.map((t, i) => <span key={i} className={'tok' + (playing && i < s.scramblePos ? ' done' : '')}>{t}</span>)}
-          <span className="n">{s.scrambleMoves.length} moves</span>
-        </>}
+      {typing ? (
+        <form className="enter" onSubmit={e => { e.preventDefault(); enter(); }}>
+          <input autoFocus value={text} onChange={e => setText(e.target.value)} aria-label="Scramble to solve"
+                 placeholder="Paste or type a scramble, then Enter" onKeyDown={e => { if (e.key === 'Escape') setTyping(false); }} />
+        </form>
+      ) : (
+        <span id="scrambleTokens">
+          {!s.scrambleMoves.length ? '---' : <>
+            {s.scrambleMoves.map((t, i) => <span key={i} className={'tok' + (playing && i < s.scramblePos ? ' done' : '')}>{t}</span>)}
+            <span className="n">{s.scrambleMoves.length} moves</span>
+          </>}
+        </span>
+      )}
+      <span className="sbtns">
+        {note && <span className="note-inline">{note}</span>}
+        {typing
+          ? <><button onClick={enter}>Solve</button><button onClick={() => setTyping(false)}>Cancel</button></>
+          : <button onClick={() => setTyping(true)} title="Solve a scramble of your own">Enter scramble</button>}
+        <button onClick={share} disabled={!s.scrambleMoves.length || playing}>Share</button>
       </span>
     </div>
   );

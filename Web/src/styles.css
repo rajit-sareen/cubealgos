@@ -204,6 +204,12 @@ table.data.stats td { font-weight: 700; }
 /* Scramble Bar Buttons */
 #scrambleBar .sbtns { margin-left: auto; display: flex; gap: 6px; flex: none; }
 #scrambleBar .sbtns button { padding: 2px 10px; font-size: 11px; }
+#scrambleBar .note-inline { color: var(--grey); font-size: 11px; text-transform: none; align-self: center; }
+#scrambleBar .enter { flex: 1 1 auto; min-width: 0; display: flex; }
+#scrambleBar .enter input { flex: 1; min-width: 0; font: inherit; font-size: 15px; font-weight: 700; text-transform: none; padding: 2px 8px; border: var(--rule); background: var(--paper); color: var(--ink); }
+.quick button.go { font-weight: 700; }
+.sheet .actions { flex-wrap: nowrap; }
+.sheet .actions .wide-btn { margin-top: 0; }
 .tscramble #scrambleTokens { flex: 1 1 auto; min-width: 0; font-size: 18px; white-space: normal; overflow: visible; line-height: 1.6; }
 .toolbar select { font-weight: 700; padding: 2px 8px; }
 .tb-info { color: var(--grey); font-size: 12px; text-transform: none; }

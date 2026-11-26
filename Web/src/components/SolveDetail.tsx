@@ -2,10 +2,9 @@ import { useEffect, useState } from 'react';
 import { timer, useTimer } from '../timer/timer';
 import type { Analysis, Penalty } from '../timer/db';
 import { fmt, fmtSolve, methodOf, stageTimes } from '../timer/stats';
-import { HAS_CROSS, METHOD_STAGES, simMethod } from '../timer/profile';
+import { HAS_CROSS, METHOD_STAGES } from '../timer/profile';
 import { crossLook, stageSummary } from '../timer/insights';
-import { sim } from '../sim';
-import { COLOR_NAMES } from '../cube';
+import { copyText, openScramble, profileSolving, readScramble, scrambleLink } from '../share';
 import { CrossBars, SplitBars } from './Charts';
 import { Net } from './Net';
 
@@ -18,6 +17,7 @@ export function SolveDetail() {
   const s = idx >= 0 ? t.solves[idx] : null;
   const [a, setA] = useState<Analysis | null>(null);
   const [failed, setFailed] = useState(false);
+  const [copied, setCopied] = useState(false);
   useEffect(() => {
     setA(null); setFailed(false);
     if (!s) return;
@@ -44,13 +44,9 @@ export function SolveDetail() {
   const look = a ? crossLook(a, color) : null;
   const lengths = a ? Object.fromEntries(a.crosses.map(c => [c.color, c.moves.length])) : null;
   const pen = (p: Penalty) => timer.setPenalty(s.id, p);
-  const analyze = () => {
-    timer.open(null);
-    location.hash = '#/sim';
-    // On the profile's method and cross colour, the shortest cross for a neutral solver
-    const cross = COLOR_NAMES.indexOf(t.crossColor());
-    sim.loadScramble(s.scramble.split(/\s+/).filter(Boolean),
-      { method: simMethod(t.profile), cross: cross < 0 ? null : cross });
+  const moves = readScramble(s.scramble);
+  const share = async () => {
+    if (await copyText(scrambleLink(moves!, profileSolving()))) { setCopied(true); setTimeout(() => setCopied(false), 1500); }
   };
   return (
     <div className="modal" onMouseDown={e => { if (e.target === e.currentTarget) timer.open(null); }}>
@@ -99,7 +95,10 @@ export function SolveDetail() {
           </section>}
 
           <section className="pane wide">
-            <button className="wide-btn" style={{ marginTop: 0 }} onClick={analyze}>Analyze solve</button>
+            <div className="row actions">
+              <button className="wide-btn" disabled={!moves} onClick={() => openScramble(moves!)}>Analyze solve</button>
+              <button className="wide-btn" disabled={!moves} onClick={share}>{copied ? 'Link copied' : 'Copy link'}</button>
+            </div>
           </section>
         </div>
         {s.penalty !== 'ok' && <div className="sheet-foot">Raw {fmt(s.time)}</div>}

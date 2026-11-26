@@ -71,7 +71,10 @@ export function StatsPage() {
   );
 
   const onImport = async (f: File) => {
-    try { setMsg(`Imported ${await timer.importJson(await f.text())} solves`); }
+    try {
+      const r = await timer.importJson(await f.text());
+      setMsg(`Imported ${r.solves} solves` + (r.skipped ? `, skipped ${r.skipped} non-3x3 session${r.skipped > 1 ? 's' : ''}` : ''));
+    }
     catch (e) { setMsg(e instanceof Error ? e.message : 'Import failed'); }
   };
   return <>
@@ -84,8 +87,8 @@ export function StatsPage() {
       <span className="tb-info">{n} solves{busy ? ` · analysing ${t.analyzing.done}/${t.analyzing.total}` : ''}{msg && ` · ${msg}`}</span>
       <span className="sbtns">
         <button onClick={async () => download('cubealgos-solves.json', await timer.exportAll())}>Export</button>
-        <button onClick={() => file.current?.click()}>Import</button>
-        <input ref={file} type="file" accept="application/json,.json" hidden
+        <button onClick={() => file.current?.click()} title="A cubealgos or csTimer export">Import</button>
+        <input ref={file} type="file" accept=".json,.txt,application/json,text/plain" hidden
                onChange={e => { const f = e.target.files?.[0]; if (f) onImport(f); e.target.value = ''; }} />
       </span>
     </div>

@@ -131,6 +131,51 @@ it('keeps the view in front when fixed', async () => {
   button('Fixed view').click();
 });
 
+it('analyzes the last solve straight from the timer', async () => {
+  await go('#/', '#main.timer');
+  const scramble = timer.last()!.scramble.split(' ');
+  button('Analyze').click();
+  await vi.waitFor(() => expect($('#seq .g')).not.toBeNull());
+  expect(location.hash).toBe('#/sim');
+  expect(sim.scrambleMoves).toEqual(scramble);
+});
+
+it('solves a scramble typed into the simulator', async () => {
+  button('Enter scramble').click();
+  await vi.waitFor(() => expect($('#scrambleBar input')).not.toBeNull());
+  const input = $('#scrambleBar input') as HTMLInputElement;
+  const type = (v: string) => {
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(input, v);
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+  };
+  type('R U Q');
+  button('Solve', '#scrambleBar').click();
+  await vi.waitFor(() => expect(text('#scrambleBar')).toContain('Not a scramble'));
+  type("R U' F2 L’ Rw D");
+  button('Solve', '#scrambleBar').click();
+  await vi.waitFor(() => expect(sim.scrambleMoves).toEqual(['R', "U'", 'F2', "L'", 'r', 'D']));
+  await vi.waitFor(() => expect($('#seq .g')).not.toBeNull());
+  expect($('#scrambleBar input')).toBeNull();
+});
+
+it('shares a link that opens the same solve elsewhere', async () => {
+  let copied = '';
+  Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText: async (t: string) => { copied = t; } } });
+  button('blue', '.crosses').click();
+  await vi.waitFor(() => expect(text('#seq .g')).toContain('blue cross'));
+  const scramble = [...sim.scrambleMoves], method = sim.method;
+  button('Share', '#scrambleBar').click();
+  await vi.waitFor(() => expect(copied).toContain('#/sim?s='));
+
+  await sim.run(sim.reset);
+  sim.cross = null;
+  location.hash = copied.slice(copied.indexOf('#'));
+  await vi.waitFor(() => expect(location.hash).toBe('#/sim'));
+  await vi.waitFor(() => expect(text('#seq .g')).toContain('blue cross'));
+  expect(sim.scrambleMoves).toEqual(scramble);
+  expect(sim.method).toBe(method);
+});
+
 it('opens every page', async () => {
   await go('#/stats', '#main.stats');
   await go('#/profile', '[aria-current=page][href="#/profile"]');

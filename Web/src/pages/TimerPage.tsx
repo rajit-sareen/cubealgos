@@ -3,6 +3,7 @@ import { timer, useTimer } from '../timer/timer';
 import { fmt, fmtSolve, methodOf, stageTimes } from '../timer/stats';
 import { METHOD_STAGES, profileName } from '../timer/profile';
 import { Net } from '../components/Net';
+import { openScramble, readScramble } from '../share';
 
 const TOUCH = typeof matchMedia !== 'undefined' && matchMedia('(pointer: coarse)').matches;
 const MODIFIERS = new Set(['Shift', 'Control', 'Alt', 'Meta', 'CapsLock', 'Tab']);
@@ -128,6 +129,8 @@ export function TimerPage() {
               <button className={last.penalty === '+2' ? 'on' : ''} onClick={() => timer.setPenalty(last.id, '+2')}>+2</button>
               <button className={last.penalty === 'dnf' ? 'on' : ''} onClick={() => timer.setPenalty(last.id, 'dnf')}>DNF</button>
               <button onClick={() => { if (confirm('Delete the last solve?')) timer.deleteSolve(last.id); }} aria-label="Delete">&times;</button>
+              <button className="go" disabled={!readScramble(last.scramble)} onClick={() => openScramble(readScramble(last.scramble)!)}
+                      title="See this scramble solved in the simulator">Analyze &rarr;</button>
             </div>
           )}
         </div>
@@ -235,7 +238,7 @@ function SolveList() {
             </table>
             {n > shown && <button className="wide-btn" onClick={() => setShown(shown + PAGE)}>Show {Math.min(PAGE, n - shown)} more</button>}
           </div>
-        ) : <div className="empty">No solves yet.</div>}
+        ) : <div className="empty">No solves yet. Coming from csTimer? <a href="#/stats">Import your times</a></div>}
       </div>
       <Settings />
       {!t.saved && <p className="warn">Storage blocked: solves won't be saved.</p>}

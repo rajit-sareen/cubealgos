@@ -5,6 +5,7 @@ import * as db from './db';
 import type { Analysis, Penalty, Session, Solve } from './db';
 import { fmt, fmtSolve, sessionStats, type SessionStats } from './stats';
 import { DEFAULT_PROFILE, type Profile } from './profile';
+import { isCsTimer, readCsTimer } from './cstimer';
 
 export type Phase = 'idle' | 'inspect' | 'holding' | 'ready' | 'running';
 export const CROSS_COLORS = ['white', 'yellow', 'green', 'blue', 'red', 'orange', 'neutral'] as const;
@@ -198,22 +199,29 @@ class Timer {
     return JSON.stringify({ format: 'cubealgos-timer', version: 1, sessions: this.sessions,
       solves: solves.map(withoutAnalysis) }, null, 1);
   }
-  // Imported solves keep their ids, so importing the same file twice adds nothing
-  async importJson(text: string) {
-    const data = JSON.parse(text);
-    if (data?.format !== 'cubealgos-timer' || !Array.isArray(data.solves) || !Array.isArray(data.sessions))
-      throw new Error('Not a cubealgos timer export');
-    const sessions: Session[] = data.sessions.filter((s: Session) => s && s.id && s.name);
-    const known = new Set(sessions.map(s => s.id));
-    const solves: Solve[] = data.solves.filter((s: Solve) =>
-      s && s.id && known.has(s.session) && typeof s.time === 'number' && typeof s.scramble === 'string'
-      && ['ok', '+2', 'dnf'].includes(s.penalty));
+  // A cubealgos or a csTimer export. Imported solves keep their ids, so importing the
+  // same file twice adds nothing. skipped counts csTimer sessions of other puzzles
+  async importJson(text: string): Promise<{ solves: number; skipped: number }> {
+    let data;
+    try { data = JSON.parse(text); } catch { throw new Error('Not a cubealgos or csTimer export'); }
+    let sessions: Session[], solves: Solve[], skipped = 0;
+    if (isCsTimer(data)) {
+      ({ sessions, solves, skipped } = readCsTimer(data));
+    } else {
+      if (data?.format !== 'cubealgos-timer' || !Array.isArray(data.solves) || !Array.isArray(data.sessions))
+        throw new Error('Not a cubealgos or csTimer export');
+      sessions = data.sessions.filter((s: Session) => s && s.id && s.name);
+      const known = new Set(sessions.map(s => s.id));
+      solves = data.solves.filter((s: Solve) =>
+        s && s.id && known.has(s.session) && typeof s.time === 'number' && typeof s.scramble === 'string'
+        && ['ok', '+2', 'dnf'].includes(s.penalty));
+    }
     await db.put('sessions', ...sessions);
     await db.put('solves', ...solves.map(withoutAnalysis));
     const have = new Set(this.sessions.map(s => s.id));
     this.sessions = [...this.sessions, ...sessions.filter(s => !have.has(s.id))].sort((a, b) => a.created - b.created);
     await this.selectSession(this.sessionId);
-    return solves.length;
+    return { solves: solves.length, skipped };
   }
 
   // Scrambles

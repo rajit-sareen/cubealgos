@@ -105,9 +105,46 @@ describe('timer', () => {
     expect(timer.solves).toHaveLength(1);
     await timer.deleteSolve(id);
     expect(timer.solves).toHaveLength(0);
-    expect(await timer.importJson(file)).toBe(1);
+    expect(await timer.importJson(file)).toEqual({ solves: 1, skipped: 0 });
     expect(timer.solves[0].id).toBe(id);
-    await expect(timer.importJson('{}')).rejects.toThrow();
+    await expect(timer.importJson('{}')).rejects.toThrow('csTimer');
+    await expect(timer.importJson('not json')).rejects.toThrow('csTimer');
+  });
+
+  // The shape csTimer writes: sessionData as a string of JSON, a 2x2 session whose
+  // scrambles pass for 3x3, a session holding a rotation, an empty session, a multi-phase
+  // solve, and penalties as numbers
+  it('imports a csTimer export', async () => {
+    const before = timer.sessions.length;
+    const file = JSON.stringify({
+      session1: [
+        [[0, 12345], "R U2 F' D L2 B R' U F2 D'", '', 1700000000],
+        [[2000, 15000], "U R2 F B' L D2 R U' F L'", 'nice', 1700000100],
+        [[-1, 20000], "D' L F2 R B U2 L' D R2 F", '', 1700000200],
+        [[0, 30000, 21000, 9000], "F U' R2 D B2 L' U F' R D2", '', 1700000300],
+      ],
+      session6: JSON.stringify([[[0, 20000, 16000, 11000, 3000], "L U2 R' D F2 B U' R2 D'", '', 1700000800]]),
+      session2: [[[0, 3000], "R U' F2 R' U F' R2", '', 1700000400]],
+      session3: [[[0, 9000], "R2 U F' R U' F2 R' U2 F", '', 1700000500], [[0, 8000], "x R U", '', 1700000600]],
+      session4: [],
+      session5: [[[0, 11000], "B2 U L' D R2 F U' R B'", '', 1700000700]],
+      properties: { sessionData: JSON.stringify({
+        1: { name: 'Main', opt: {} }, 2: { name: '2x2', opt: { scrType: '222so' } }, 5: { name: 'OH', opt: { scrType: '333oh' } },
+      }) },
+    });
+    expect(await timer.importJson(file)).toEqual({ solves: 6, skipped: 2 });
+    expect(await timer.importJson(file)).toEqual({ solves: 6, skipped: 2 });
+    expect(timer.sessions).toHaveLength(before + 3);
+    expect(timer.sessions.map(s => s.name)).toEqual(expect.arrayContaining(['Main (csTimer)', 'OH (csTimer)']));
+    await timer.selectSession('cstimer-1');
+    expect(timer.solves.map(s => [s.time, s.penalty, s.date])).toEqual([
+      [12345, 'ok', 1700000000000], [15000, '+2', 1700000100000], [20000, 'dnf', 1700000200000], [30000, 'ok', 1700000300000]]);
+    expect(timer.solves.every(s => !s.splits)).toBe(true);
+    expect(timer.stats.bestSingle).toBe(12345);
+
+    // Four Phases, Last First, Become Stage Splits
+    await timer.selectSession('cstimer-6');
+    expect(stageTimes(timer.solves[0])).toEqual([3000, 8000, 5000, 4000]);
   });
 
   it('marks the stages, then stops', async () => {

@@ -6,6 +6,7 @@ import { TimerPage } from './pages/TimerPage';
 import { StatsPage } from './pages/StatsPage';
 import { ProfilePage } from './pages/ProfilePage';
 import { SolveDetail } from './components/SolveDetail';
+import { followLink } from './share';
 
 const ROUTES = [
   { path: '', name: 'Timer' },
@@ -57,6 +58,12 @@ export function App() {
   const t = useTimer();
   const [theme, toggleTheme] = useTheme();
   useEffect(() => { sim.boot(); timer.boot(); }, []);
+  // A shared scramble link, on arrival or pasted into the address bar of an open tab
+  useEffect(() => {
+    followLink();
+    window.addEventListener('hashchange', followLink);
+    return () => window.removeEventListener('hashchange', followLink);
+  }, []);
   const solving = route.path === '' && t.settings.focus && t.phase !== 'idle';
   const cls = [s.opts.rgb && 'rgb', s.opts.modern && 'modern', s.opts.grey && 'greydim', solving && 'focus']
     .filter(Boolean).join(' ');
